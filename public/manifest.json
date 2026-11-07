@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "GameDeck — Sports Window Manager",
+  "version": "2.0.0",
+  "minimum_chrome_version": "116",
+  "description": "Arrange your existing signed-in Chrome sports tabs into real windows. Local window management with no video capture.",
+  "permissions": ["tabs", "storage", "system.display"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Open GameDeck" },
+  "options_page": "dashboard.html",
+  "commands": {
+    "promote": { "suggested_key": { "default": "Alt+Shift+M" }, "description": "Promote selected game to main" },
+    "cycle-focus": { "suggested_key": { "default": "Alt+Shift+Right" }, "description": "Focus next game" },
+    "next-layout": { "suggested_key": { "default": "Alt+Shift+L" }, "description": "Next compatible layout" },
+    "previous-layout": { "suggested_key": { "default": "Alt+Shift+P" }, "description": "Restore previous arrangement" },
+    "minimize-secondary": { "description": "Minimize secondary games" },
+    "restore-all": { "description": "Restore managed games" }
+  },
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'none'" }
+}

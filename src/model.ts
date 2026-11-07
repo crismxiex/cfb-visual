@@ -1,0 +1,51 @@
+export type Rect = { left: number; top: number; width: number; height: number };
+export type LayoutId = 'single' | 'two-equal' | 'two-main' | 'three-main' | 'three-horizontal' | 'four-grid' | 'four-main' | 'six-grid' | 'custom';
+export type Game = { key: string; title: string; url: string; slot: number; teams?: string; score?: string };
+export type Binding = { tabId: number; windowId: number; originalWindowId: number; originalIndex: number; originalBounds: Rect; originalPinned: boolean; originalDiscardable: boolean; managed: boolean };
+export type Snapshot = { layout: LayoutId; displayId: string; order: string[] };
+export type Preset = Snapshot & { id: string; name: string };
+export type Deck = { games: Game[]; layout: LayoutId; displayId: string; gap: number; selected: string | null; presets: Preset[]; previous?: Snapshot; custom: { columns: number; rows: number } };
+export type Runtime = { bindings: Record<string, Binding>; warnings: string[]; arranged: boolean };
+export type Display = { id: string; name: string; isPrimary: boolean; workArea: Rect };
+export type View = { deck: Deck; runtime: Runtime; tabs: chrome.tabs.Tab[]; windows: chrome.windows.Window[]; displays: Display[] };
+export type Command = { type: string; [key: string]: unknown };
+export const emptyDeck = (): Deck => ({ games: [], layout: 'three-main', displayId: '', gap: 8, selected: null, presets: [], custom: { columns: 2, rows: 2 } });
+export const emptyRuntime = (): Runtime => ({ bindings: {}, warnings: [], arranged: false });
+
+export function normalizeUrl(raw: string): string {
+  const value = raw.trim();
+  const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`);
+  if (url.protocol !== 'https:' || !url.hostname.includes('.') || url.username || url.password) throw new Error('Enter a valid HTTPS website URL without embedded credentials.');
+  return url.href;
+}
+// Strip common credentials from disk persistence; runtime browser URLs stay in Chrome.
+export function durableUrl(raw: string): string {
+  const url = new URL(normalizeUrl(raw));
+  for (const key of [...url.searchParams.keys()]) if (/token|auth|signature|credential|password|secret|jwt|policy|key-pair-id|^sig$|^key$/i.test(key)) url.searchParams.delete(key);
+  if (/token|auth|password|secret|jwt/i.test(url.hash)) url.hash = '';
+  return url.href;
+}
+export function provider(raw: string): string {
+  let host: string; try { host = new URL(raw).hostname.replace(/^www\./, ''); } catch { return 'Website'; }
+  return /(^|\.)disneyplus\.com$/.test(host) ? 'Disney+' : /(^|\.)espn\.com$/.test(host) ? 'ESPN' : /(^|\.)dazn\.com$/.test(host) ? 'DAZN' : host;
+}
+export function reconcile(games: Game[], tabs: chrome.tabs.Tab[], windows: chrome.windows.Window[], bindings: Record<string, Binding>): Record<string, Binding> {
+  const result: Record<string, Binding> = {};
+  const used = new Set<number>();
+  const eligible = tabs.filter(t => t.id != null && !t.incognito && /^https:\/\//.test(t.url || t.pendingUrl || '') && windows.some(w => w.id === t.windowId && ['normal', 'popup'].includes(w.type || '')));
+  for (const game of [...games].sort((a,b) => Number(!!bindings[b.key]) - Number(!!bindings[a.key]))) {
+    const old = bindings[game.key];
+    const tab = eligible.find(t => !used.has(t.id!) && t.id === old?.tabId) || eligible.find(t => {
+      try { return !used.has(t.id!) && durableUrl(t.url || t.pendingUrl!) === game.url; } catch { return false; }
+    });
+    if (!tab) continue;
+    used.add(tab.id!);
+    const win = windows.find(w => w.id === tab.windowId)!;
+    result[game.key] = old?.tabId === tab.id ? { ...old, windowId: tab.windowId, managed: old.managed && old.windowId === tab.windowId } : {
+      tabId: tab.id!, windowId: tab.windowId, originalWindowId: tab.windowId, originalIndex: tab.index,
+      originalBounds: { left: win.left ?? 0, top: win.top ?? 0, width: win.width ?? 800, height: win.height ?? 600 },
+      originalPinned: !!tab.pinned, originalDiscardable: tab.autoDiscardable !== false, managed: false,
+    };
+  }
+  return result;
+}

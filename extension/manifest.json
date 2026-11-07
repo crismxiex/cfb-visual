@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Saturday — CFB Multiview",
+  "version": "1.3.0",
+  "description": "Control your existing, logged-in Chrome game tabs. Arrange real player windows and click to switch audio. No capture.",
+  "minimum_chrome_version": "116",
+  "permissions": ["tabs", "storage", "system.display", "scripting"],
+  "optional_host_permissions": ["https://*.disneyplus.com/*", "https://*.dazn.com/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Open Saturday multiview" },
+  "options_page": "dashboard.html",
+  "commands": {
+    "next-game": { "suggested_key": { "default": "Alt+Shift+Right" }, "description": "Listen to the next game" },
+    "mute-games": { "suggested_key": { "default": "Alt+Shift+M" }, "description": "Mute all selected games" }
+  }
+}
