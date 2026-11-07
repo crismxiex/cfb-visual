@@ -1,105 +1,155 @@
-# Saturday — control your existing Chrome game tabs
+# GameDeck — local sports window manager
 
-This version uses the game tabs you already have open and signed in to. It moves those exact tabs into compact Chrome windows on your viewing monitor. A separate controller manages audio, the main game, layout, and fullscreen.
+GameDeck arranges your existing, signed-in Chrome sports tabs as real independent popup windows. The React dashboard is a layout map and control panel. Your original streaming pages continue running in the same Chrome profile; no video is captured, embedded, mirrored, proxied, or retransmitted.
 
-**No video mirroring, screen-sharing picker, separate browser profile, or new provider login.** The game windows remain real, separate Chrome windows arranged together into a multibox.
+## Windows 11 setup
 
-## Switch to this version
+The production extension is already built in **dist/**. Normal layout and audio features require no server or native executable. The optional immersive helper is separate.
 
-1. Close the earlier **Saturday desktop app** and its visualizer. It is no longer needed for this setup. End any previous tiled extension session before reloading the extension.
-2. In the Chrome profile where Disney+ and DAZN are already signed in, open `chrome://extensions` and click **Reload** on **Saturday — CFB Multiview**. This is version **1.3.0**.
-3. Close any older Saturday controller tabs, then click Saturday’s extension icon while viewing one of your game tabs. The new controller says **CHROME MULTIBOX CONTROLLER**.
-4. Choose **Add game tabs**, select your existing game tabs, choose your viewing monitor, and click **Arrange games**.
+1. If Saturday is currently managing your tabs, use its **End session & restore tabs** first. Do not let two controllers manage the same tabs.
+2. Keep Chrome open normally in the profile where your streaming services are signed in. No restart or debugging flag is required.
+3. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose:
 
-If the extension is not yet installed, enable **Developer mode** at `chrome://extensions`, choose **Load unpacked**, and select:
+   ```text
+   dist/
+   ```
 
-`extension/`
+4. Pin **GameDeck — Sports Window Manager** from Chrome's extensions menu and click its icon. The dashboard opens in its own window.
+5. Choose **Add existing tab**, find the playing game, and click its row. GameDeck adopts that exact tab without reopening its URL.
+6. Paste another game's HTTPS URL. A matching open tab is reused; otherwise Chrome opens it using the current profile. Start its player manually if needed.
+7. Choose your viewing monitor and **Main + two** for three games. The main game occupies approximately 65% of the width, with two games stacked on the right.
+8. Drag tiles between positions or choose **Make main**. The actual Chrome windows move without deliberate navigation or reload.
 
-No server, native executable, npm install, or build is required to use the extension.
+Only install **dist/** for GameDeck. The previous Saturday implementation remains in **extension/**, with its guide at [extension/README-legacy.md](extension/README-legacy.md). The older WebView2 prototype in **desktop/** is not used by GameDeck.
 
-## Your seven-game setup
+## Development
 
-1. Start every game in its own Chrome tab. Enable sound inside each provider’s player.
-2. Put the Saturday controller on your control monitor.
-3. Use **Add game tabs** to select the seven already-open game tabs. Titles and provider names identify them. No URL is reopened and no cookie or login data is copied.
-4. Choose the other monitor under **Viewing monitor**.
-5. Choose **Main game above the others**, then **Arrange games**. With seven games, the main game spans the top; six smaller player windows form two rows of three beneath it.
-6. Use **Listen** to change sound, **Make main** to enlarge a different game, and **Go to game** to raise a particular player and select its audio.
-
-**Add active Chrome tab** attaches the most recently focused website tab. Clicking the extension icon on a game also remembers that game as the source. The controller shows its title above the lineup. You can also select any open game through the tab picker.
-
-## Make the windows cleaner
-
-After the games are playing and arranged, choose **Clean player view**. Chrome will ask for optional access to the selected Disney+/DAZN sites. If granted, Saturday brings the existing playing video to the front and sizes it to its current browser window. The video is not moved to another page, copied, captured, or reloaded.
-
-- **Fit · whole picture** preserves the whole frame and scoreboard. A very wide main box will still have black bars because the video keeps its aspect ratio.
-- **Fill · crops the picture** removes letterboxing by cropping the video. It can cut off scoreboards, captions, or action; choose Fit to keep the entire frame visible.
-- **Restore page controls** reverses the styling. There is also a small restore button inside each cleaned page. Pausing, ending, errors, or replacing the playing video restores its page styling automatically; choose Clean player view again after restarting playback if needed.
-- **Tight window spacing** removes the requested gaps. After Clean player view has page access, it also uses reported browser measurements to compensate for invisible popup resize borders. Turn this off if the edges overlap on your display.
-
-Chrome’s native title bars remain. The optional styling is for visible, already-playing HTML video in Disney+/DAZN pages, their same-origin embedded documents, and accessible shadow roots. It does not access a different site’s embedded player or change authentication, ads, stream sources, or DRM. If a provider’s player cannot be adjusted, use its own theater view. The new styling has automated DOM tests; its appearance on live Disney+/DAZN pages is not yet verified.
-
-## Controller actions
-
-| Control | What it does |
-| --- | --- |
-| Arrange games | Move existing tabs into a multibox on the selected monitor |
-| Make main | Resize/reposition the existing player windows around that main game |
-| Equal grid | Give the game windows equal-sized boxes |
-| Listen | Mute other selected tabs, then enable that game’s tab audio |
-| Click a game window | Select its sound when follow-click is enabled |
-| Bring games forward | Raise the arranged game windows, then return focus to the controller |
-| Fullscreen main game | Show the main game alone across its viewing monitor |
-| Return to multibox | Exit main-game fullscreen and restore every game window to the grid |
-| × beside a game | Remove that game from control and restore its tab |
-| End session & restore tabs | Return the tabs to regular Chrome windows and restore their previous mute/pin/discard settings |
-
-Main game and audio are independent. Promoting a game does not change which game you hear. Fullscreening the main game temporarily covers the other games on that monitor; **Return to multibox** restores them. A multi-window layout fills the monitor’s available desktop area rather than making several windows fullscreen at once.
-
-The controller’s **Layout overview** is a diagram of the arrangement, not a video preview. Click a diagram box for audio or double-click it to promote a game; the actual games remain in their Chrome windows.
-
-Add or remove games while the multibox is arranged and it reflows automatically. Closing a game window also reflows the remaining players. You can watch three, four, five, seven, or up to nine games. Use each original player’s own volume controls; the controller selects which tab is muted or unmuted.
-
-## Shortcuts
-
-| Shortcut | Action |
-| --- | --- |
-| `1`–`9` in controller | Select the corresponding lineup game’s audio |
-| `M` in controller | Mute selected games |
-| `Alt+Shift+Right` in Chrome | Cycle game audio |
-| `Alt+Shift+M` in Chrome | Mute selected games |
-
-Change Chrome-wide shortcuts at `chrome://extensions/shortcuts`. They are not OS-wide shortcuts.
-
-## End the session before reloading Chrome
-
-Choose **End session & restore tabs** before restarting Chrome or reloading, disabling, or removing the extension. The tab IDs and restore map are kept for the current browser session. Closing just the controller keeps the current layout/audio session available through its extension icon.
-
-If moving the last tab closed its original window, restoration creates a replacement regular Chrome window and regroups its tabs. A compact popup player first moves through a regular Chrome window so tab restoration respects Chrome’s window-type restrictions. Original tab groups and the full configuration of a closed browser window are not restored.
-
-Games removed from the session return to their previous mute settings and are no longer controlled by Saturday. Unselected browser tabs and other apps can still produce sound. If the controller becomes unavailable, Chrome’s tab context menu can unmute a game and move it to a regular window manually.
-
-## Practical limits
-
-- Use the same regular Chrome profile as your active provider logins. Incognito tabs are excluded.
-- Chrome and Windows may enforce minimum window sizes. The controller reports when Chrome changes the requested bounds. Use fewer games, Equal grid, or a larger display if players overlap.
-- Provider page UI stays in the player windows unless the optional Clean player view can adjust its playing video. A provider may pause or adapt playback when a tab moves or resizes; interact with that original player if needed.
-- Start each provider’s player and enable its in-player sound. Unmuting a Chrome tab cannot override a mute button inside the provider’s player.
-- If the viewing display disconnects, choose another monitor and arrange again.
-- Actual window placement and live provider behavior have not been automated on your desktop. Tests use Chrome API and DOM mocks; they do not establish live-playback performance.
-
-## Privacy and development
-
-Everything runs in the extension. There are no captures, recordings, video relays, stream uploads, analytics, or cookie imports. The extension uses `tabs`, `storage`, and `system.display` to read tab names/URLs, control selected tabs/windows, store the current session, and read monitor bounds. `scripting` plus optional, user-granted Disney+/DAZN site access enables Clean player view. That optional function styles the actual existing video and restores those styles when you exit the view. It does not read credentials or copy browser sessions. Baseline arranging and audio control work without granting site access.
-
-Run the checks with Node.js 20+:
+Use a current Node.js version supported by Vite (Node 22.12+ recommended).
 
 ```powershell
-node --test tests/*.test.js
+npm ci
+npm run build
+npm test
 ```
 
-The extension checks cover controller command wiring, existing-tab attachment, native-window layout, seven-game arrangements, main/audio independence, mute ordering, fullscreen/return, monitor changes, follow-click, popup-safe restoration, session recovery, player-view permission gating, reversible CSS changes, Fit/Fill selection, and the absence of capture/cookie-import code in the shipped extension.
+After edits, build again and reload GameDeck at `chrome://extensions`. Reloading does not close your game tabs. Runtime IDs are reconciled again; restoration to original windows may require replacement normal windows if the restore map was lost.
 
-`node scripts/preview.js` serves only the extension controller layout at `http://127.0.0.1:4173`; actual tab control needs the installed Chrome extension. Other work in this shared workspace has added Vite/Vitest scripts to the root package; the direct command above runs these extension-specific checks without depending on that separate app’s setup.
+```powershell
+npm run dev
+# http://127.0.0.1:5173/dashboard.html
+npm run preview
+# http://127.0.0.1:4173/dashboard.html
+```
 
-The previous standalone WebView2 prototype remains under `desktop/` for reference. It uses its own provider logins and is not needed for this Chrome-tab version.
+HTTP previews explicitly display **Extension preview** and cannot manage tabs. They contain no fabricated games or video. Actual controls require installation in Chrome. All scripts and styles are bundled locally; there is no CDN or hosted backend.
+
+## Features
+
+- Paste HTTPS URLs with validation, normalization, existing-tab reuse, duplicate prevention, first-free-slot assignment, and immediate layout application.
+- Search existing normal/popup website tabs, including Disney+, ESPN, DAZN, and other HTTPS sites.
+- Drag to swap occupied positions or move into an empty slot. The swap button also lets you click a destination in the layout map.
+- Promote any game to slot 1, explicitly focus its window, minimize, or restore it.
+- Edit your own game titles, teams, and scores. Nothing is scraped from protected content. **Connected** means the tab exists, not that playback was verified.
+- **Remove, keep window open** stops management while keeping the page running. **Return to regular tab** moves the same tab to its original normal window or a replacement. **Close browser tab…** requires a separate confirmation.
+- Save named arrangements, restore the previous arrangement, configure spacing, and choose custom grids with 1–3 rows and columns (up to nine games).
+- Select a monitor using its actual work area, including taskbar exclusions and negative monitor coordinates.
+
+Built-in layouts: Single Game; Two Side by Side; Two Main + Secondary (70/30); Three Main + Two (65/35); Three Horizontal (one above two); Four Grid; Four Main + Three; Six Grid (3×2 landscape or 2×3 portrait). Adding a game automatically selects a layout with enough usable slots, preserving existing tabs, game positions, main game and audio. Main + Two grows to Main + Three for the fourth game, then to Six Grid and a nine-slot custom grid as needed. A custom grid expands automatically. A larger current layout stays selected. Only impossible monitor sizes or more than nine games block addition; GameDeck checks this before opening a new URL. Explicitly selecting or restoring an undersized layout is still rejected before geometry changes. Unused slots remain available.
+
+## Clean player view (v2.3)
+
+Start each provider's player, then click **Clean player view** above the layout map. GameDeck asks for optional scripting access and only the specific managed Disney+, DAZN and ESPN origins selected for this action. Normal URL insertion, window layouts and audio work without this access. Other HTTPS sites can still be managed as windows but are not styled by this feature.
+
+The feature ports Saturday's player-only presentation: the original playing video stays in its original document and is positioned over the website interface to fill the window's content area. Its source, playback state, audio and authentication are untouched. It does not create a player, iframe or video copy, capture pixels, use exclusive fullscreen, or remove Chrome title bars. Open shadow roots and existing same-origin player frames are supported; inaccessible cross-origin players may require the provider's own theater view.
+
+- **Fit · whole picture** uses proportional contain framing, keeping the whole image and scoreboard visible; black bars can remain.
+- **Fill · crop edges** uses proportional cover framing. It crops the edges rather than stretching, and may crop scoreboards or captions.
+- **Restore page controls**, the button inside each cleaned page, or Escape restores presentation and the previous native-video-controls setting.
+
+Pausing, ending, an error or replacing the video automatically restores page controls. There is no forced reapplication. Changing Fit/Fill updates currently active clean views without restarting views you restored. The report says **Last applied** because provider behavior can restore a page later. Removing/returning a game restores its clean view first where permission is available. Restore page controls before reloading, disabling or removing the extension. If you previously used Saturday's clean view, restore it there before enabling GameDeck's version to avoid competing page styles.
+
+## Audio control (v2.2)
+
+Single-click a game tile, or press Enter/Space while it is focused, to hear only that game. This does not move, focus, activate, navigate or reload any game window. Dragging suppresses the synthetic click after drop. Each tile shows Chrome's actual mute flag; the designated audio tile also has a blue border. Main position and audio selection are separate indicators.
+
+**Follow main game** is enabled by default. Promoting a game or dragging it into slot 1 switches audio before window movement begins. Swapping two secondary games preserves audio. Clicking a secondary tile temporarily overrides audio; ordinary arrangement and layout changes do not revert it unless the main identity changes. Disable Follow main to keep audio independent even when promoting games. **Mute all** explicitly enters silence. Per-game unmute selects that game exclusively rather than enabling overlapping audio.
+
+All audio requests run through a serialized controller. It validates the target, waits for other managed tabs to mute, then unmutes the target and publishes the new source. Initial management selects the available main game and mutes others. New games respect the current source or mute-all state. Replaced tabs retain stable game identity. A missing active game falls back to an available main, otherwise an explicit no-audio state.
+
+Manual Chrome mute events are observed. Muting the active game enters silence without repeatedly unmuting it. Manually unmuting another managed tab designates it and mutes the others. Events from this extension are recognized and ignored, preventing feedback loops. Turning **Manage audio** off, removing a game or returning its tab restores the earlier tab mute setting only when the current state is still owned by GameDeck; newer manual choices and other extensions' choices are preserved. Unmanaged tabs are never muted.
+
+Enable sound inside the provider's own player first. Tab unmuting cannot override in-player muting. Volume and protected media remain under the original provider's control.
+
+## Edge-to-edge arrangement
+
+The default gap is zero; Preferences supports 0, 2, 4 and 8 pixels. The first upgrade to v2.2 migrates older geometry preferences to zero gap. Saved positions and game identities are preserved. Shared slot edges use integer rounding of boundaries, preventing internal rounding gaps or overlap. At 1920×1032, Main + Three is exactly a 1248×1032 main rectangle beside three 672×344 rectangles.
+
+**Respect taskbar** uses the selected monitor's work area. **Fill entire display** uses its full reported bounds. This does not hide the taskbar or force topmost placement; Windows may keep an always-visible taskbar above a normal window. Chrome/Windows can enforce minimum dimensions and frame bounds; actual returned Chrome geometry is checked and discrepancies are reported. Mathematical slot coverage does not guarantee removal of invisible resize borders, title bars or provider controls.
+
+Video letterboxing is separate from window geometry. Window layout never changes video presentation. The optional Clean player view changes CSS only; Fit retains letterboxing, while an explicitly selected Fill crops proportionally. Neither mode distorts the aspect ratio.
+
+**Immersive mode** optionally uses the locally built Windows native-messaging helper to reduce native frames. It validates each target using Chrome process identity, tab title and an observed movement challenge, then stores and restores the original style and geometry. Chrome may retain custom-drawn decorations; fully borderless playback is not guaranteed. Closing the last dashboard or exiting immersive mode restores pairs. A recovery command is provided for forced termination. See [native setup, targeting and restoration](native/README.md). The helper is not registered or enabled automatically.
+
+## Keyboard shortcuts
+
+Click a tile or lineup row to select a game. Configure all commands at `chrome://extensions/shortcuts`.
+
+| Command | Default |
+| --- | --- |
+| Promote selected game | Alt+Shift+M |
+| Focus next game | Alt+Shift+Right |
+| Next compatible layout | Alt+Shift+L |
+| Previous arrangement | Alt+Shift+P |
+| Minimize secondary games | Assign in Chrome |
+| Restore all managed games | Assign in Chrome |
+
+Chrome allows at most four suggested shortcuts, so two start unbound. Other extensions may reserve the defaults. These are Chrome shortcuts, not guaranteed OS-wide shortcuts. The dashboard also accepts Alt+M, Alt+Right, Alt+L, and Alt+P outside text inputs.
+
+## Architecture
+
+| Source | Responsibility |
+| --- | --- |
+| public/manifest.json | Manifest V3, module worker, minimal permissions, six commands |
+| src/background.ts | Dashboard launch, trusted message routing, tab/display lifecycle and commands |
+| src/controller.ts | Serialized tab/window orchestration, adoption, restoration, preferences and recovery |
+| src/clean-player.ts, src/player-view-controller.ts, src/player-controls.tsx | Optional reversible provider-page presentation and controls |
+| src/audio-controller.ts | Exclusive audio, follow-main, manual mute ownership and safe restoration |
+| src/native.ts, native/ | Optional validated native-messaging bridge and Windows geometry/style helper |
+| src/layout.ts | Pure rectangle calculations and layout definitions |
+| src/model.ts | Types, HTTPS validation, provider metadata, one-to-one reconciliation |
+| src/store.ts | Zustand state and asynchronous Chrome command responses |
+| src/main.tsx, src/style.css | React dashboard, tab picker, drag-and-drop and Tailwind-backed styling |
+| src/diagnostics.ts | Explicit real-Chrome integration check with isolated test state |
+
+`chrome.storage.local` stores stable game keys, titles, HTTPS URLs with recognized credential parameters removed, slots, monitor preference, layout, spacing, custom grid, presets, and the previous arrangement. Tab/window IDs and original-window restoration data live only in `chrome.storage.session`. Cookies, credentials, player contents, and session tokens are never accessed.
+
+Initialization inventories current windows with `chrome.windows.getAll({populate:true})`. It reserves surviving exact tab IDs, then matches saved games to remaining tabs one to one by URL. Runtime IDs are not trusted across browser restarts. Duplicate URLs do not attach multiple games to one tab. Startup attempts to restore matched games; missing games stay **Unavailable** until **Reopen…** is explicitly confirmed. Reopening checks existing tabs again before creating a window. Use **Arrange windows** if Chrome restores a matching tab later.
+
+Commands run sequentially to prevent competing geometry updates. Each successful adoption is saved immediately so a subsequent API failure does not lose that identity. GET requests do not write storage, avoiding refresh loops. Tab and display events reconcile current state. Rearrangement does not deliberately focus windows; explicit focus commands do.
+
+## API and platform limitations
+
+- Permissions are only `tabs`, `storage`, and `system.display`. The `windows` namespace needs no separate permission. There are no required host permissions, persistent content scripts, capture APIs, cookie access, video processing or iframe players. Optional scripting and limited provider-origin access are requested only for Clean player view. The optional nativeMessaging permission is requested only for immersive mode.
+- `windows.create({tabId,type:'popup'})` adopts an existing tab. `tabs.move` works only between normal windows, so returning a popup uses a temporary normal-window bridge when needed. If the original normal window closed, restoration creates a replacement and regroups restoration targets. Original tab groups and full window/tab-strip configuration are not reconstructed.
+- Display work areas exclude OS-reserved space. Coordinates are passed through in Chrome's units without multiplying by devicePixelRatio. Mixed display scaling, window borders, OS rounding and Chrome minimum dimensions may alter requested bounds. Returned bounds are checked and visible warnings explain adjustments.
+- Every slot includes the browser frame and the provider's own page UI. An extension cannot remove Windows chrome, embed arbitrary native windows, or make multiple windows exclusive fullscreen simultaneously.
+- Incognito tabs, Chrome internal pages, installed PWA/app windows, native applications, and other Chrome profiles are outside the supported scope.
+- Moving the same tab avoids deliberate reloads but cannot guarantee uninterrupted playback. Providers may pause/throttle background players, require gestures, or impose stream limits. GameDeck does not bypass DRM, HDCP, subscription limits, or autoplay restrictions.
+- Saved URLs are ordinary provider watch-page links. Recognized token/auth/signature parameters are stripped before disk storage; signed links may not reopen. Do not paste credential-bearing URLs. Saved titles and URLs remain local browsing metadata.
+- The optional native helper manages only validated Chrome window styles and geometry. It is separate from the extension build and requires explicit local registration. See native/README.md for limitations, tests and crash recovery.
+
+Official references checked: [windows](https://developer.chrome.com/docs/extensions/reference/api/windows), [tabs.move restrictions](https://developer.chrome.com/docs/extensions/reference/api/tabs#method-move), [display workArea](https://developer.chrome.com/docs/extensions/reference/api/system/display), [commands](https://developer.chrome.com/docs/extensions/reference/api/commands), and [local/session storage](https://developer.chrome.com/docs/extensions/reference/api/storage).
+
+## Verification and real Chrome test
+
+`npm test` runs the preserved Saturday Node tests and GameDeck's Vitest tests. GameDeck covers all layouts, portrait/negative-origin monitors, overlap and containment, odd-pixel rounding, URL validation, identity reconciliation, URL reuse, duplicate prevention, serialized commands, swaps without navigation, sparse positions, restart recovery, missing games, display disconnection, safe popup restoration, removal versus closing, minimize/restore, OS bounds warnings, custom presets and minimal permission/capture checks.
+
+**The build, automated GameDeck/legacy tests, React interaction tests, native-bridge tests, and helper protocol/geometry self-test pass.** Real provider playback and optional native style changes require separate verification. Automated API and DOM tests do not establish uninterrupted DRM playback.
+
+After installing, copy GameDeck's extension ID from `chrome://extensions`, open `chrome-extension://<extension-id>/diagnostics.html`, and click **Run window test**. It opens three harmless example.com pages, adopts their actual tab IDs, promotes/swaps real windows, minimizes/restores them, checks controller recovery, restores a popup tab through a normal window, and reports page loading events during orchestration. It closes only its test tabs and uses isolated in-memory storage, excluding existing tabs from discovery. This validates window management, not DRM playback.
+
+Then run the provider acceptance flow: start BYU vs. Utah in your normal profile, adopt it, add Texas vs. Missouri and another game, choose **Main + two**, promote another game, and confirm the original players keep running without a screen-sharing indicator.
+
+Live check status for v2.2: the existing Chrome dashboard was observed running v2.1.0 with four connected games. Computer Use was stopped with Escape before reloading it. The v2.2 live-stream checks and native registration/activation were not performed.
+
+Version 2.3 validation: production build and automated layout-growth, clean-player DOM, permission, and UI interaction tests passed. Provider playback and page presentation have not been verified against live authenticated streams in this update.

@@ -6,3 +6,5 @@ artifacts/
 *.zip
 desktop/vendor/
 desktop/bin/
+native/bin/
+native/com.gamedeck.windows.json

@@ -10,7 +10,20 @@ export const layouts: { id: LayoutId; name: string; capacity: number; descriptio
   { id: 'six-grid', name: 'Six-game grid', capacity: 6, description: 'The full game-day lineup' },
   { id: 'custom', name: 'Custom grid', capacity: 9, description: 'Choose your rows and columns' },
 ];
-export function calculateLayout(area: Rect, id: LayoutId, gap = 8, custom = { columns: 2, rows: 2 }): Rect[] {
+export function layoutForAddition(area: Rect, current: LayoutId, slots: number, gap: number, custom: {columns:number;rows:number}) {
+  if(!Number.isInteger(slots)||slots<1||slots>9)throw new Error('GameDeck supports up to nine games.');
+  const fits=(id:LayoutId,grid=custom)=>{try{return calculateLayout(area,id,gap,grid).length>=slots;}catch{return false;}};
+  if(fits(current))return {layout:current,custom};
+  const focused=current==='single'||current.includes('main');
+  const candidates:LayoutId[]=focused?['two-main','two-equal','three-main','three-horizontal','four-main','four-grid','six-grid']:['two-equal','two-main','three-horizontal','three-main','four-grid','four-main','six-grid'];
+  if(current!=='custom')for(const id of candidates)if(fits(id))return {layout:id,custom};
+  const grids=Array.from({length:9},(_,i)=>({columns:i%3+1,rows:Math.floor(i/3)+1}))
+    .filter(g=>g.columns*g.rows>=slots)
+    .sort((a,b)=>a.columns*a.rows-b.columns*b.rows||(area.width>=area.height?b.columns-a.columns:b.rows-a.rows));
+  for(const grid of grids)if(fits('custom',grid))return {layout:'custom' as LayoutId,custom:grid};
+  throw new Error(`Cannot fit ${slots} games on this display at usable window sizes. Choose a larger monitor or remove a game.`);
+}
+export function calculateLayout(area: Rect, id: LayoutId, gap = 0, custom = { columns: 2, rows: 2 }): Rect[] {
   if (![area.left,area.top,area.width,area.height,gap].every(Number.isFinite) || area.width < 320 || area.height < 240) throw new Error('The selected monitor has no usable work area.');
   gap = Math.round(Math.max(0, Math.min(32, gap)));
   const x = Math.round(area.left), y = Math.round(area.top), w = Math.floor(area.width), h = Math.floor(area.height);

@@ -12,11 +12,19 @@ chrome.action.onClicked.addListener(async()=>{
   else await chrome.windows.create({url,type:'popup',width:1280,height:900});
 });
 chrome.runtime.onStartup.addListener(()=>safe('STARTUP'));
-chrome.tabs.onRemoved.addListener(()=>safe('SYNC'));
+const checkDashboardClosed=async()=>{
+  try{const tabs=await chrome.tabs.query({});if(!tabs.some(t=>t.url?.startsWith(chrome.runtime.getURL('dashboard.html'))))await controller.request({type:'DASHBOARD_CLOSED'});}catch(error){console.error(error);}
+};
+chrome.tabs.onRemoved.addListener(id=>{controller.request({type:'TAB_CLOSED',tabId:id}).catch(console.error);void checkDashboardClosed();});
 chrome.tabs.onDetached.addListener(()=>safe('GET'));
 chrome.tabs.onAttached.addListener(()=>safe('GET'));
-chrome.tabs.onUpdated.addListener((_id,info)=>{if(info.url) safe('GET');});
+chrome.tabs.onUpdated.addListener((tabId,info)=>{
+  if(info.mutedInfo)controller.request({type:'AUDIO_CHANGED',tabId,mutedInfo:info.mutedInfo}).catch(console.error);
+  else if(info.url)safe('METADATA');
+});
+chrome.tabs.onReplaced.addListener((addedTabId,removedTabId)=>controller.request({type:'TAB_REPLACED',addedTabId,removedTabId}).catch(console.error));
 chrome.system.display.onDisplayChanged.addListener(()=>safe('SYNC'));
+chrome.windows.onRemoved.addListener(()=>void checkDashboardClosed());
 const commands:Record<string,string>={promote:'PROMOTE','cycle-focus':'CYCLE_FOCUS','next-layout':'NEXT_LAYOUT','previous-layout':'PREVIOUS','minimize-secondary':'MINIMIZE_SECONDARY','restore-all':'RESTORE_ALL'};
 chrome.commands.onCommand.addListener(async name=>{
   try {const view=await controller.request({type:'GET'});await controller.request({type:commands[name],key:view.deck.selected});}catch(error){console.error(error);}
