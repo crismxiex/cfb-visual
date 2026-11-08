@@ -1,12 +1,10 @@
 import { createController } from './controller';
 import {createScoreboardService,SCORE_ALARM} from './sports/service';
-import {live,stale} from './sports/types';
+import {scoreOverlayCommand} from './sports/overlay';
 const controller=createController(chrome);
 const sports=createScoreboardService(chrome,controller);
-sports.onChange(async({settings,cache})=>{
-  const events=cache.events.filter(e=>settings.overlay.eventIds.length?settings.overlay.eventIds.includes(e.id):live(e));
-  const freshness=cache.updatedAt?`${cache.providerName.split(' · ')[0]} · ${stale(cache)?'cached · ':''}${new Intl.DateTimeFormat('en-US',{timeZone:'America/Mexico_City',hour:'numeric',minute:'2-digit'}).format(new Date(cache.updatedAt))} MX`:'no data';
-  const result=await controller.request({type:'SCORE_OVERLAY',enabled:settings.enabled&&settings.overlay.enabled,settings:settings.overlay,events,freshness});
+sports.onChange(async view=>{
+  const result=await controller.request(scoreOverlayCommand(view));
   return result.runtime.overlayStatus;
 });
 const safe=(type:string)=>controller.request({type}).catch(console.error);
@@ -27,7 +25,7 @@ chrome.runtime.onInstalled.addListener(()=>void sports.startup().catch(console.e
 chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name===SCORE_ALARM)void sports.refresh().catch(console.error);});
 void sports.startup().catch(console.error);
 const checkDashboardClosed=async()=>{
-  try{const tabs=await chrome.tabs.query({});if(!tabs.some(t=>t.url?.startsWith(chrome.runtime.getURL('dashboard.html'))))await controller.request({type:'DASHBOARD_CLOSED'});}catch(error){console.error(error);}
+  try{const tabs=await chrome.tabs.query({});if(!tabs.some(t=>{if(!t.url?.startsWith(chrome.runtime.getURL('dashboard.html')))return false;return new URL(t.url).searchParams.get('view')!=='ticker';}))await controller.request({type:'DASHBOARD_CLOSED'});}catch(error){console.error(error);}
 };
 chrome.tabs.onRemoved.addListener(id=>{controller.request({type:'TAB_CLOSED',tabId:id}).catch(console.error);void checkDashboardClosed();});
 chrome.tabs.onDetached.addListener(()=>safe('GET'));

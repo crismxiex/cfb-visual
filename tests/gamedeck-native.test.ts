@@ -31,4 +31,12 @@ describe('optional native window bridge',()=>{
   });
   it('requires the upgraded helper before attempting a native ticker',async()=>{const f=fixture();f.oldHelper();await expect(f.native.connect(true)).rejects.toThrow(/v2.4/);expect(f.calls.some(c=>c.action==='prepare')).toBe(false);await f.native.stop();});
   it('keeps the native ticker connected when immersive window styling is restored',async()=>{const f=fixture();await f.native.connect(true);await f.native.overlay({enabled:true,lines:[]});await f.native.restoreWindows();expect(f.calls.some(c=>c.action==='disconnect')).toBe(false);await f.native.overlay({enabled:false});await f.native.restoreWindows();expect(f.calls.at(-1).action).toBe('disconnect');});
+  it('rejects reused pairing on changed monitor geometry before native placement',async()=>{
+    const f=fixture();await f.native.connect();await f.native.place('game',1,10,f.monitor,f.rect);const count=f.calls.filter(c=>c.action==='place').length;
+    await expect(f.native.place('game',1,10,{...f.monitor,left:1920},f.rect)).rejects.toThrow(/monitor geometry changed/);expect(f.calls.filter(c=>c.action==='place')).toHaveLength(count);await f.native.stop();
+  });
+  it('includes extension-specific setup instructions when the helper cannot start',async()=>{
+    const f=fixture();f.api.runtime.id='abcdefghijklmnopabcdefghijklmnop';f.reject('hello');
+    await expect(f.native.connect(true)).rejects.toThrow(/install.ps1 -ExtensionId abcdefghijklmnopabcdefghijklmnop/);await f.native.stop();
+  });
 });

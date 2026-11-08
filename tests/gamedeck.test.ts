@@ -229,6 +229,12 @@ describe('one-click control room acceptance',()=>{
   it('replacement tabs retain stable audio/game identity',async()=>{
     const f=await four();const v=await f.controller.request({type:'GET'});const old=f.tabs.get(1);f.tabs.delete(1);f.tabs.set(99,{...old,id:99});const r=await f.controller.request({type:'TAB_REPLACED',removedTabId:1,addedTabId:99});expect(r.runtime.bindings[v.deck.games[0].key].tabId).toBe(99);expect(r.runtime.audio.key).toBe(v.deck.games[0].key);expect(f.tabs.get(99).mutedInfo.muted).toBe(false);
   });
+  for(const restart of [false,true])it(`unmutes a muted replacement of the active source${restart?' after worker restart':''}`,async()=>{
+    const f=await four();const v=await f.controller.request({type:'GET'}),key=v.deck.games[0].key;
+    const old=f.tabs.get(1);f.tabs.delete(1);f.tabs.set(99,{...old,id:99,mutedInfo:{muted:true}});
+    const r=await (restart?createController(f.api):f.controller).request({type:'TAB_REPLACED',removedTabId:1,addedTabId:99});
+    expect(r.runtime.audio).toEqual({mode:'solo',key});expect(f.tabs.get(99).mutedInfo.muted).toBe(false);expect([2,3,4].every(id=>f.tabs.get(id).mutedInfo.muted)).toBe(true);
+  });
   it('Fill entire display uses full bounds while Respect taskbar uses work area',async()=>{
     const f=await four();const r=await f.controller.request({type:'DISPLAY_MODE',mode:'full'});for(const game of r.deck.games){const win=f.windows.get(r.runtime.bindings[game.key].windowId);expect(win.top+win.height).toBeLessThanOrEqual(980);}expect(f.windows.get(r.runtime.bindings[r.deck.games[0].key].windowId).height).toBe(1080);
     const back=await f.controller.request({type:'DISPLAY_MODE',mode:'workArea'});expect(f.windows.get(back.runtime.bindings[back.deck.games[0].key].windowId).height).toBe(1040);
@@ -298,6 +304,15 @@ describe('optional native score ticker reservation',()=>{
     f.api.permissions={contains:async()=>true};f.api.runtime.connectNative=()=>port;
   }
   const options={enabled:true,position:'bottom',height:64,opacity:.9,clickThrough:true,reserve:true,eventIds:[]};
+  for(const mode of ['LOAD_PRESET','PREVIOUS'])it(`${mode} restores native windows and hides the ticker before changing monitors`,async()=>{
+    const f=fixture();helper(f);f.displays.push({...f.displays[0],id:'right',isPrimary:false,workArea:{left:0,top:0,width:1920,height:1040},bounds:{left:0,top:0,width:1920,height:1080}});
+    await f.add(1);await f.controller.request({type:'DISPLAY',displayId:'right'});const saved=await f.controller.request({type:'SAVE_PRESET',name:'Right monitor'});await f.controller.request({type:'DISPLAY',displayId:'left'});
+    await f.controller.request({type:'IMMERSIVE',enabled:true});await f.controller.request({type:'SCORE_OVERLAY',enabled:true,settings:options,events:[]});f.calls.length=0;
+    const r=await f.controller.request({type:mode,id:saved.deck.presets[0].id});
+    expect(r.deck.displayId).toBe('right');expect(r.runtime.immersive).toBe(false);expect(r.runtime.scoreOverlay?.active).toBe(false);
+    const restore=f.calls.findIndex(c=>c[0]==='native'&&c[1].action==='restoreAll'),firstMove=f.calls.findIndex(c=>c[0]==='windows.update');expect(restore).toBeGreaterThan(-1);expect(firstMove).toBeGreaterThan(restore);
+    const win=f.windows.get(r.runtime.bindings[r.deck.games[0].key].windowId);expect(win.left).toBe(0);expect(win.height).toBe(1040);expect(f.calls.some(c=>c[0]==='native'&&c[1].action==='place')).toBe(false);
+  });
   it('reserves and then restores monitor space without recreating or navigating stream windows',async()=>{
     const f=fixture();helper(f);await f.controller.request({type:'LAYOUT',layout:'four-main'});for(const id of [1,2,3,4])await f.add(id);const before=await f.controller.request({type:'GET'});f.calls.length=0;
     const shown=await f.controller.request({type:'SCORE_OVERLAY',enabled:true,settings:options,events:[],freshness:'test'});expect(shown.runtime.scoreOverlay?.active).toBe(true);expect(f.windows.get(shown.runtime.bindings[shown.deck.games[0].key].windowId).height).toBe(976);

@@ -3,20 +3,21 @@ import { Headphones, Volume2, VolumeX } from 'lucide-react';
 import { playerOrigin } from './player-view-controller';
 import { useDeck } from './store';
 
-function GameVolume({gameKey,title,volume,available,busy}:{gameKey:string;title:string;volume?:number;available:boolean;busy:boolean}) {
+function GameVolume({gameKey,title,volume,available}:{gameKey:string;title:string;volume?:number;available:boolean}) {
   const send=useDeck(s=>s.send);
   const [value,setValue]=useState(Math.round((volume??1)*100));
   const draft=useRef(value),dirty=useRef(false),timer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  useEffect(()=>{if(!dirty.current){const next=Math.round((volume??1)*100);draft.current=next;setValue(next);}},[volume]);
-  useEffect(()=>()=>clearTimeout(timer.current),[]);
+  const sending=useRef(false),mounted=useRef(true);
+  useEffect(()=>{if(!dirty.current&&!sending.current){const next=Math.round((volume??1)*100);draft.current=next;setValue(next);}},[volume]);
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;clearTimeout(timer.current);};},[]);
   function commit(){
-    clearTimeout(timer.current);if(!dirty.current)return;dirty.current=false;
+    clearTimeout(timer.current);if(!dirty.current||sending.current||!mounted.current)return;dirty.current=false;sending.current=true;
     void send({type:'SET_VOLUME',key:gameKey,volume:draft.current/100}).then(ok=>{
-      if(!ok&&!dirty.current){const actual=useDeck.getState().view?.runtime.bindings[gameKey]?.playerAudio?.volume;draft.current=Math.round((actual??volume??1)*100);setValue(draft.current);}
-    });
+      if(!ok&&!dirty.current&&mounted.current){const actual=useDeck.getState().view?.runtime.bindings[gameKey]?.playerAudio?.volume;draft.current=Math.round((actual??volume??1)*100);setValue(draft.current);}
+    }).finally(()=>{sending.current=false;if(dirty.current&&mounted.current)commit();});
   }
   return <label className="game-volume" title={available?'Player volume':'Enable volume controls, start playback, then refresh audio'}>
-    <input type="range" min="0" max="100" step="1" aria-label={`Volume for ${title}`} aria-valuetext={available?`${value}%`:'Unavailable'} disabled={!available||busy} value={value}
+    <input type="range" min="0" max="100" step="1" aria-label={`Volume for ${title}`} aria-valuetext={available?`${value}%`:'Unavailable'} disabled={!available} value={value}
       onChange={e=>{draft.current=Number(e.target.value);setValue(draft.current);dirty.current=true;clearTimeout(timer.current);timer.current=setTimeout(commit,150);}}
       onPointerUp={commit} onKeyUp={commit} onBlur={commit}/>
     <output>{available?`${value}%`:'—'}</output>
@@ -34,7 +35,7 @@ export function GameAudio({gameKey}:{gameKey:string}) {
   return <div className="game-audio" onClick={e=>e.stopPropagation()} onKeyDown={e=>e.stopPropagation()}>
     <button className={`button secondary small listen-button ${solo?'listening':''}`} disabled={!tab||!view?.deck.audioEnabled} title="Hear only this game; mute the other managed games" aria-label={`Listen only to ${game?.title||'this game'}`} aria-pressed={solo} onClick={()=>void send({type:'LISTEN',key:gameKey})}><Headphones size={13}/>{solo?'Listening':'Listen'}</button>
     <button className={`icon-button ${muted?'audio-muted':''}`} disabled={!tab||!view?.deck.audioEnabled} title={muted?'Listen only to this tab':'Mute all managed tabs'} aria-label={`${muted?'Unmute':'Mute'} ${game?.title||'this game'}`} aria-pressed={muted} onClick={()=>void send({type:'TOGGLE_MUTE',key:gameKey})}>{muted?<VolumeX size={16}/>:<Volume2 size={16}/>}</button>
-    <GameVolume gameKey={gameKey} title={game?.title||'this game'} volume={player?.volume} available={!!tab&&!!view?.deck.audioEnabled&&!!player?.available} busy={busy}/>
+    <GameVolume gameKey={gameKey} title={game?.title||'this game'} volume={player?.volume} available={!!tab&&!!view?.deck.audioEnabled&&!!player?.available}/>
     {player&&!player.available&&<span className="player-audio-status" title={player.status}>Player volume unavailable</span>}
   </div>;
 }

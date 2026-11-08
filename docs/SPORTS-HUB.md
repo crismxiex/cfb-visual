@@ -72,9 +72,13 @@ Associations persist as a stable GameDeck game key plus `{provider: 'espn', even
 
 ## Optional native score ticker
 
+For a ticker without a native installation, choose **CFB Live → Desktop score ticker → Open browser ticker** (also available in Preferences). This opens or restores a single regular Chrome popup on the selected monitor. It uses the same live score cache, confirmed event links and audio commands. It does not move streaming windows, reserve layout space or request native messaging. Chrome title bars and ordinary Z-order remain; always-on-top, click-through and window opacity require the native option below.
+
 The ticker uses the existing optional Native Messaging companion, extended with a separate WinForms presentation module in `native/ScoreOverlay.cs`. It draws formatted score text in its own non-activating, topmost window. It does not embed a browser, inject a score overlay into Disney+/DAZN, access video, capture pixels, read credentials or make native network requests.
 
 Rebuild/re-register the helper for v2.4 using [native setup](../native/README.md). **Show ticker** requests the existing optional `nativeMessaging` permission. At least one managed game is required to validate the selected monitor through the existing native window-pairing challenge. Old helpers are detected and an upgrade message is shown.
+
+**Show ticker** also enables score updates and requests missing score-feed access. If startup fails, the controls show the actual error and **Retry ticker**, with an installation command containing this extension's ID when Chrome cannot start the helper. Installation now runs the non-UI helper self-test before registration. A fresh worker restores the configured ticker from a same-day cache without waiting for another network poll. Changing dates clears old ticker entries while the requested day loads; same-day scores remain explicitly marked as cached on a feed failure.
 
 Choose top/bottom, height 40–160 logical pixels, opacity 20–100%, click-through mode and individual event checkboxes. With no explicit event selection, live games are shown. The native row pages across larger selections every eight seconds; game clocks remain the provider's last reported values.
 

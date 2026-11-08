@@ -37,12 +37,13 @@ export function App(){
   const active=deck.games.filter(g=>runtime.bindings[g.key]).length;
   async function addUrl(e:React.FormEvent){e.preventDefault();if(await send({type:'ADD_URL',url}))setUrl('');}
   const action=(type:string,key?:string)=>void send({type,key});
+  if(new URLSearchParams(location.search).get('view')==='ticker')return <main className="browser-ticker" aria-label="Browser score ticker"><SportsBootstrap/><Scoreboard compact/>{error&&<p role="alert">{error}</p>}</main>;
   return <div className="app-shell"><SportsBootstrap/>
     <aside className="sidebar">
       <a className="brand" href="#" onClick={()=>setSection('Workspace')}><span className="brand-mark"><i/><i/><i/></span>GameDeck<span className="beta">LOCAL</span></a>
       <div className="sidebar-label">GAME DAY CONTROL</div>
       <nav>{[{name:'Workspace',icon:LayoutDashboard},{name:'CFB Live',icon:Monitor},{name:'Saved layouts',icon:Save},{name:'Preferences',icon:Settings2}].map(({name,icon:Icon})=><button key={name} className={section===name?'nav-item active':'nav-item'} onClick={()=>setSection(name)}><Icon size={18}/>{name}{name==='Workspace'&&<span className="nav-count">{deck.games.length}</span>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="privacy-icon"><ShieldCheck size={20}/></div><strong>Your streams stay yours.</strong><p>Real Chrome windows.<br/>Your profile. Your sessions.</p><button className="help-link" onClick={()=>setSection('How it works')}><CircleHelp size={15}/>How GameDeck works<ArrowUpRight size={14}/></button><div className="version">GAMEDECK <span>v2.4.0</span></div></div>
+      <div className="sidebar-bottom"><div className="privacy-icon"><ShieldCheck size={20}/></div><strong>Your streams stay yours.</strong><p>Real Chrome windows.<br/>Your profile. Your sessions.</p><button className="help-link" onClick={()=>setSection('How it works')}><CircleHelp size={15}/>How GameDeck works<ArrowUpRight size={14}/></button><div className="version">GAMEDECK <span>v2.4.2</span></div></div>
     </aside>
     <div className="body"><header className="topbar"><div className="breadcrumb">GameDeck <ChevronRight size={14}/><span>{section}</span></div><div className="connection"><span className={connected?'status-dot':'status-dot offline'}/>{connected?'Chrome connected':'Extension preview'}<span className="divider"/><ShieldCheck size={14}/>On your device</div></header>
     <main>

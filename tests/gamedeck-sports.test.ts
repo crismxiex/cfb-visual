@@ -5,6 +5,8 @@ import {createScoreboardService} from '../src/sports/service';
 import {createStreamingLauncher,DEFAULT_SERVICES,customService} from '../src/sports/services';
 import {detectChanges} from '../src/sports/alerts';
 import {suggestEvents} from '../src/sports/matcher';
+import {scoreOverlayCommand} from '../src/sports/overlay';
+import {openBrowserTicker} from '../src/sports/browser-ticker';
 
 // Synthetic protocol fixtures are used only in tests, never as dashboard data.
 function event(id='1',homeScore:unknown='14',awayScore:unknown='7'){
@@ -45,6 +47,46 @@ describe('background scoreboard scheduling',()=>{
   });
   it('does not duplicate alerts when the same provider snapshot arrives again',async()=>{
     const f=fixture();await f.service.request({type:'SPORTS_FAVORITE',teamId:'2483'});await f.service.refresh(true);f.provider.fetchScores.mockResolvedValue({...batch(),events:normalizeScoreboard({events:[event('1','14','13')]})});await f.service.refresh(true);const first=(await f.service.view()).cache.alerts;await f.service.refresh(true);expect((await f.service.view()).cache.alerts).toEqual(first);expect(first).toHaveLength(1);
+  });
+  it('restores a cached ticker at startup without fetching before the next poll',async()=>{
+    const f=fixture();await f.service.refresh(true);f.saved.gamedeckSports.overlay.enabled=true;
+    const service=createScoreboardService(f.api,{request:async()=>({}) as any},f.provider,()=>f.saved.gamedeckScores.updatedAt);
+    const notify=vi.fn(async()=> 'Native ticker visible.');service.onChange(notify);await service.startup();
+    expect(notify).toHaveBeenCalledTimes(1);expect(notify.mock.calls[0][0].cache.events).toHaveLength(1);expect(f.provider.fetchScores).toHaveBeenCalledTimes(1);
+  });
+  it('reports failed ticker starts and retries without clearing scores or fetching again',async()=>{
+    const f=fixture();await f.service.refresh(true);const notify=vi.fn().mockRejectedValueOnce(new Error('Native host not found')).mockResolvedValue('Native ticker visible.');f.service.onChange(notify);
+    let result=await f.service.request({type:'SPORTS_SETTINGS',patch:{overlay:{enabled:true}}}) as any;expect(result.cache.overlayStatus).toContain('Native host not found');expect(result.cache.events).toHaveLength(1);
+    result=await f.service.request({type:'SPORTS_RETRY_OVERLAY'}) as any;expect(result.cache.overlayStatus).toBe('Native ticker visible.');expect(f.provider.fetchScores).toHaveBeenCalledTimes(1);
+  });
+  it('merges independent partial overlay updates instead of overwriting earlier choices',async()=>{
+    const f=fixture();await Promise.all([f.service.request({type:'SPORTS_SETTINGS',patch:{overlay:{position:'top'}}}),f.service.request({type:'SPORTS_SETTINGS',patch:{overlay:{reserve:true}}})]);
+    expect((await f.service.view()).settings.overlay).toMatchObject({position:'top',reserve:true,height:64});
+  });
+});
+describe('ticker data selection',()=>{
+  it('never sends the previous date to the native ticker while fetching another day',()=>{
+    const settings={...defaults(),enabled:true,date:'2026-11-08'},cache={...emptyCache(),...batch(),updatedAt:Date.parse('2026-11-07T22:00Z')};settings.overlay.enabled=true;
+    const command=scoreOverlayCommand({settings,cache,access:true},Date.parse('2026-11-07T22:01Z'));
+    expect(command.enabled).toBe(true);expect(command.events).toEqual([]);expect(command.freshness).toContain('2026-11-08 · awaiting scores');
+    cache.error='Offline';expect(scoreOverlayCommand({settings,cache,access:true}).events).toEqual([]);
+  });
+  it('keeps same-day cached scores on feed failures and includes explicitly selected final games',()=>{
+    const settings={...defaults(),enabled:true,date:'2026-11-07'},cache={...emptyCache(),...batch(),updatedAt:1,error:'Offline'};settings.overlay.enabled=true;settings.overlay.eventIds=['1'];cache.events[0].status='final';
+    const command=scoreOverlayCommand({settings,cache,access:true});expect(command.events).toHaveLength(1);expect(command.freshness).toContain('cached');
+  });
+});
+describe('browser ticker without a native helper',()=>{
+  it('opens a regular extension popup on the selected monitor without native access or moving streams',async()=>{
+    const create=vi.fn(async()=>({id:22})),request=vi.fn(async()=>({deck:{displayId:'left',displayMode:'workArea'},displays:[{id:'left',workArea:{left:-1920,top:-100,width:1920,height:1040}}]}));
+    const api:any={runtime:{getURL:(path:string)=>'chrome-extension://test/'+path},tabs:{query:async()=>[]},windows:{create}};
+    expect(await openBrowserTicker(api,{request} as any,'bottom')).toEqual({opened:22});
+    expect(create).toHaveBeenCalledExactlyOnceWith({url:'chrome-extension://test/dashboard.html?view=ticker',type:'popup',focused:true,left:-1920,top:760,width:1920,height:180});expect(request).toHaveBeenCalledExactlyOnceWith({type:'GET'});
+  });
+  it('restores and focuses an existing ticker without creating a duplicate',async()=>{
+    const update=vi.fn(async()=>({})),create=vi.fn(),request=vi.fn();const url='chrome-extension://test/dashboard.html?view=ticker';
+    const api:any={runtime:{getURL:()=>url},tabs:{query:async()=>[{id:9,windowId:22,url}],update},windows:{get:async()=>({state:'minimized'}),update,create}};
+    expect(await openBrowserTicker(api,{request} as any,'top')).toEqual({focused:9});expect(create).not.toHaveBeenCalled();expect(request).not.toHaveBeenCalled();expect(update).toHaveBeenCalledWith(22,{state:'normal'});expect(update).toHaveBeenCalledWith(22,{focused:true});
   });
 });
 describe('Mexico streaming launchers and manual matching',()=>{

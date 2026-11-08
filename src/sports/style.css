@@ -2,4 +2,6 @@
 
 .ranked-filter{display:flex;align-items:center;gap:5px;color:#8ca5c7;font-size:10px}.cfb-options .ranked-filter input{min-width:0;width:12px;height:12px;padding:0;accent-color:#8bb5fa}
 
+.browser-ticker{padding:8px;min-height:100vh;background:#0d1521}.browser-ticker .cfb-panel{margin:0;padding:10px;border:0}.browser-ticker .cfb-heading{margin-bottom:8px}.browser-ticker .cfb-heading h2{font-size:12px}.browser-ticker .score-attribution{margin-top:6px}.browser-ticker .ticker-game{padding:8px 14px}.browser-ticker .score-empty{padding:12px}.browser-ticker .cfb-enable{padding:8px;margin:0}
+
 .layout-slot:not(.main-slot) .slot-center:has(.tile-live-score) .provider-monogram{display:none}.layout-slot:not(.main-slot) .slot-center:has(.tile-live-score) h3{font-size:8px}.layout-slot:not(.main-slot) .slot-center:has(.tile-live-score) p{font-size:7px;margin-top:3px}.layout-slot:not(.main-slot) .tile-live-score{margin-top:3px}.layout-slot:not(.main-slot) .tile-live-score small{font-size:7px;margin-top:1px}

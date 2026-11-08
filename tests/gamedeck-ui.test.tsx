@@ -12,6 +12,7 @@ vi.mock('react-dom/client',async importOriginal=>{
   return {...actual,createRoot:vi.fn(()=>({render:vi.fn()}))};
 });
 import {App} from '../src/main';
+import {OverlayControls} from '../src/sports/ui';
 
 let root:ReturnType<typeof actualCreateRoot>,container:HTMLDivElement;
 const send=vi.fn(async()=>true);
@@ -110,4 +111,23 @@ it('scoreboard Make Main promotes through the existing controller with audio sel
 });
 it('an unlinked card opens manual linking instead of guessing an audio target',async()=>{
   const command=await scores(false);await act(async()=>container.querySelector<HTMLElement>('.score-card')!.click());expect(send).not.toHaveBeenCalled();expect(container.querySelector('[aria-label="Link scoreboard event to window"]')).not.toBeNull();await act(async()=>container.querySelector<HTMLElement>('.link-window-option')!.click());expect(command).toHaveBeenCalledWith({type:'SPORTS_LINK',key:'g1',eventId:'99'});
+});
+it('Show ticker enables score updates and requests missing data and helper access together',async()=>{
+  const request=await connectPlayers();const settings=defaults(),command=vi.fn(async()=>true);
+  await act(async()=>{useSports.setState({view:{settings,cache:emptyCache(),access:false},command});root.render(<OverlayControls/>);});
+  await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Show ticker')!.click());
+  expect(request).toHaveBeenCalledWith({permissions:['nativeMessaging'],origins:['https://site.api.espn.com/*']});
+  expect(command).toHaveBeenCalledWith({type:'SPORTS_SETTINGS',patch:{enabled:true,overlay:{enabled:true}}});
+});
+it('a failed desktop ticker has a retry action and shows the startup error',async()=>{
+  const request=await connectPlayers();const settings=defaults();settings.enabled=true;settings.overlay.enabled=true;const cache=emptyCache();cache.overlayStatus='Desktop ticker unavailable: Native host not found';const command=vi.fn(async()=>true);
+  await act(async()=>{useSports.setState({view:{settings,cache,access:true},command});root.render(<OverlayControls/>);});
+  expect(container.textContent).toContain('Native host not found');await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Retry ticker')!.click());
+  expect(request).toHaveBeenCalledWith({permissions:['nativeMessaging']});expect(command).toHaveBeenCalledWith({type:'SPORTS_RETRY_OVERLAY'});
+});
+it('opens the browser ticker using score access without requesting native permissions',async()=>{
+  const request=await connectPlayers();const settings=defaults(),command=vi.fn(async()=>true);
+  await act(async()=>{useSports.setState({view:{settings,cache:emptyCache(),access:false},command});root.render(<OverlayControls/>);});
+  await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Open browser ticker')!.click());
+  expect(request).toHaveBeenCalledExactlyOnceWith({origins:['https://site.api.espn.com/*']});expect(command.mock.calls.map(c=>c[0])).toEqual([{type:'SPORTS_SETTINGS',patch:{enabled:true}},{type:'SPORTS_BROWSER_TICKER'}]);
 });

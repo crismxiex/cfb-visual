@@ -6,7 +6,7 @@ export const NATIVE_HOST='com.gamedeck.windows';
 export function createNativeManager(api:typeof chrome,onDisconnected:(reason:string)=>void) {
   let port:chrome.runtime.Port|undefined,serial=0;
   let overlayVisible=false,supportsOverlay=false;
-  const paired=new Map<string,number>();
+  const paired=new Map<string,{windowId:number;monitor:string}>();
   const pending=new Map<number,{resolve:(value:any)=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
   async function connect(requireOverlay=false){
     if(port){if(requireOverlay&&!supportsOverlay)throw new Error('Update the native helper to v2.4 using native/install.ps1 to use the score ticker.');return;}
@@ -17,7 +17,12 @@ export function createNativeManager(api:typeof chrome,onDisconnected:(reason:str
       const reason=api.runtime.lastError?.message||'Native helper disconnected; its saved window styles and geometry are restored on disconnect.';
       for(const entry of pending.values()){clearTimeout(entry.timer);entry.reject(new Error(reason));}pending.clear();paired.clear();overlayVisible=false;port=undefined;onDisconnected(reason);
     });
-    const capabilities=await request('hello',{});supportsOverlay=!!capabilities?.overlay;
+    let capabilities;
+    try{capabilities=await request('hello',{});}catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      throw new Error(`Desktop helper could not start: ${detail} From the GameDeck project folder run .\\native\\install.ps1 -ExtensionId ${api.runtime.id}, then choose Retry ticker. Windows must allow the helper executable to run.`);
+    }
+    supportsOverlay=!!capabilities?.overlay;
     if(requireOverlay&&!supportsOverlay)throw new Error('Update the native helper to v2.4 using native/install.ps1 to use the score ticker.');
   }
   function request(action:string,data:Record<string,unknown>):Promise<any>{
@@ -31,7 +36,9 @@ export function createNativeManager(api:typeof chrome,onDisconnected:(reason:str
   }
   const rect=(win:chrome.windows.Window):Rect=>({left:win.left!,top:win.top!,width:win.width!,height:win.height!});
   async function ensurePair(key:string,tabId:number,windowId:number,monitor:Rect){
-    if(paired.get(key)!==windowId){
+    const existing=paired.get(key),signature=JSON.stringify(monitor);
+    if(existing?.windowId===windowId&&existing.monitor!==signature)throw new Error('The viewing monitor geometry changed. Exit immersive mode and retry the ticker to validate the new monitor.');
+    if(existing?.windowId!==windowId){
       if(paired.has(key))await release(key);
       const win=await api.windows.get(windowId,{populate:true});
       if(win.type!=='popup'||win.tabs?.length!==1||win.tabs[0].id!==tabId)throw new Error('Immersive mode only pairs single-tab managed popup windows.');
@@ -45,7 +52,7 @@ export function createNativeManager(api:typeof chrome,onDisconnected:(reason:str
         const probe=await api.windows.update(windowId,{left:original.left+delta});
         await request('pair',{key,rect:rect(probe)});
       }finally{await api.windows.update(windowId,original);}
-      paired.set(key,windowId);
+      paired.set(key,{windowId,monitor:signature});
     }
   }
   async function place(key:string,tabId:number,windowId:number,monitor:Rect,target:Rect){

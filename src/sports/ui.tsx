@@ -3,7 +3,7 @@ import {ArrowUpRight,Bell,BellOff,ChevronDown,Link2,Monitor,Plus,Radio,RefreshCw
 import {useDeck} from '../store';
 import {useSports} from './store';
 import {CONFERENCES,defaults,emptyCache,live,mexicoDate,scoreText,selectEvents,stale} from './types';
-import type {ScoreEvent,ScoreTeam,SportsSettings} from './types';
+import type {ScoreEvent,ScoreTeam,SportsSettings,SportsPatch,OverlaySettings} from './types';
 import {ESPN_ACCESS} from './espn';
 import {DEFAULT_SERVICES} from './services';
 import type {LaunchResult} from './services';
@@ -36,9 +36,9 @@ export function Scoreboard({compact=false}:{compact?:boolean}){
   const isStale=stale(cache);
   const linked=(event:ScoreEvent)=>Object.entries(settings.links).find(([,link])=>link.provider===event.provider&&link.eventId===event.id)?.[0];
   const activate=(event:ScoreEvent)=>{const key=linked(event);if(key&&deck.view?.runtime.bindings[key])void deck.send({type:'SELECT',key});else setLinkEvent(event);};
-  const patch=(patch:Partial<SportsSettings>)=>void sports.command({type:'SPORTS_SETTINGS',patch});
+  const patch=(patch:SportsPatch)=>void sports.command({type:'SPORTS_SETTINGS',patch});
   async function enable(){if(!globalThis.chrome?.runtime?.id)return;const allowed=await chrome.permissions.request({origins:[sports.view?.accessOrigin||ESPN_ACCESS]});if(allowed)await sports.command({type:'SPORTS_SETTINGS',patch:{enabled:true}});}
-  if(compact&&!settings.enabled)return null;
+  if(compact&&!settings.enabled&&new URLSearchParams(location.search).get('view')!=='ticker')return null;
   return <section className={`cfb-panel ${compact?'cfb-workspace':'panel'}`} aria-label="CFB Live">
     <div className="cfb-heading"><div><span className="section-kicker">COLLEGE FOOTBALL · FBS</span><h2><Radio size={17}/>CFB Live {events.some(live)&&<span className="badge live-badge">LIVE</span>}</h2></div><div className="cfb-heading-actions"><span className={`freshness ${isStale?'stale':''}`}>{cache.updatedAt?`${isStale?'Cached · ':''}Updated ${time(cache.updatedAt)} MX`:'No successful update yet'}</span><button className="icon-button" title="Refresh scores now" aria-label="Refresh scores" disabled={sports.busy||!settings.enabled} onClick={()=>void sports.command({type:'SPORTS_REFRESH'})}><RefreshCw size={15} className={sports.busy?'spin':''}/></button></div></div>
     {!settings.enabled||!sports.view?.access?<div className="cfb-enable"><p>Real FBS scores from ESPN’s unofficial public data feed. Score access is optional and independent of your streaming sessions.</p><button className="button primary" disabled={!deck.connected} onClick={()=>void enable()}>Enable CFB scores</button></div>:<>
@@ -60,14 +60,47 @@ export function Scoreboard({compact=false}:{compact?:boolean}){
   </section>;
 }
 export function LinkedScore({gameKey}:{gameKey:string}){
-  const {view}=useSports();const link=view?.settings.links[gameKey];const event=link&&view.cache.events.find(e=>e.provider===link.provider&&e.id===link.eventId);if(!event)return null;
+  const {view}=useSports();const link=view?.settings.links[gameKey];const event=link&&view.cache.date===(view.settings.date||mexicoDate())&&view.cache.events.find(e=>e.provider===link.provider&&e.id===link.eventId);if(!event)return null;
   return <div className={`tile-live-score ${stale(view!.cache)?'is-stale':''}`}><strong>{event.away.abbreviation} {scoreText(event.away)} <span>—</span> {event.home.abbreviation} {scoreText(event.home)}</strong><small>{status(event)}{stale(view!.cache)?' · cached':''}</small></div>;
 }
 export function OverlayControls(){
-  const connected=useDeck(s=>s.connected);
+  const connected=useDeck(s=>s.connected),active=useDeck(s=>!!s.view?.runtime.scoreOverlay?.active);
   const {view,command,busy}=useSports();const settings=view?.settings||defaults(),overlay=settings.overlay;
-  const update=(patch:Partial<typeof overlay>)=>void command({type:'SPORTS_SETTINGS',patch:{overlay:{...overlay,...patch}}});
-  return <div className="score-overlay-controls"><h3>Desktop score ticker <span className="badge">OPTIONAL WINDOWS HELPER</span></h3><p>A separate native window above your games. Select games with the Ticker checkboxes; empty selection shows live games. Reserved space affects the viewing monitor only.</p><div className="overlay-options"><button className="button secondary small" disabled={busy||!connected} onClick={async()=>{if(!overlay.enabled&&!await chrome.permissions.request({permissions:['nativeMessaging']}))return;update({enabled:!overlay.enabled});}}>{overlay.enabled?'Hide ticker':'Show ticker'}</button><select aria-label="Overlay position" value={overlay.position} onChange={e=>update({position:e.target.value as 'top'|'bottom'})}><option value="bottom">Bottom</option><option value="top">Top</option></select><label>Height <input type="number" aria-label="Overlay height" min={40} max={160} value={overlay.height} onChange={e=>update({height:Number(e.target.value)})}/></label><label>Opacity <input type="range" aria-label="Overlay opacity" min={.2} max={1} step={.05} value={overlay.opacity} onChange={e=>update({opacity:Number(e.target.value)})}/></label><label><input type="checkbox" checked={overlay.clickThrough} onChange={e=>update({clickThrough:e.target.checked})}/>Click through</label><label><input type="checkbox" checked={overlay.reserve} onChange={e=>update({reserve:e.target.checked})}/>Reserve space</label></div>{view?.cache.overlayStatus&&<p role="status">{view.cache.overlayStatus}</p>}</div>;
+  const [notice,setNotice]=useState('');
+  const update=(patch:Partial<OverlaySettings>)=>void command({type:'SPORTS_SETTINGS',patch:{overlay:patch}});
+  async function show(){
+    try{
+      const origins=!view?.access?[view?.accessOrigin||ESPN_ACCESS]:[];
+      if(!await chrome.permissions.request({permissions:['nativeMessaging'],...(origins.length?{origins}:{})})){setNotice('Ticker access was not granted. Your game windows are unchanged.');return;}
+      setNotice('');
+      if(!settings.enabled||!overlay.enabled)await command({type:'SPORTS_SETTINGS',patch:{enabled:true,overlay:{enabled:true}}});
+      else await command({type:'SPORTS_RETRY_OVERLAY'});
+    }catch(error){setNotice(error instanceof Error?error.message:String(error));}
+  }
+  async function browserTicker(){
+    try{
+      if(!view?.access&&!await chrome.permissions.request({origins:[view?.accessOrigin||ESPN_ACCESS]})){setNotice('Score access was not granted.');return;}
+      if(!settings.enabled&&!await command({type:'SPORTS_SETTINGS',patch:{enabled:true}}))return;
+      setNotice('');await command({type:'SPORTS_BROWSER_TICKER'});
+    }catch(error){setNotice(error instanceof Error?error.message:String(error));}
+  }
+  return <div className="score-overlay-controls">
+    <h3>Desktop score ticker <span className="badge">OPTIONAL WINDOWS HELPER</span></h3>
+    <p>A separate native window above your games. Show ticker enables score updates and requests any missing access. Select games with the Ticker checkboxes; empty selection shows live games. Reserved space affects the viewing monitor only.</p>
+    <div className="overlay-options">
+      <button className="button secondary small" disabled={busy||!connected} onClick={()=>{if(overlay.enabled&&active)update({enabled:false});else void show();}}>{overlay.enabled&&active?'Hide ticker':overlay.enabled?'Retry ticker':'Show ticker'}</button>
+      {overlay.enabled&&!active&&<button className="button secondary small" disabled={busy||!connected} onClick={()=>update({enabled:false})}>Hide ticker</button>}
+      <button className="button secondary small" disabled={busy||!connected} onClick={()=>void browserTicker()}>Open browser ticker</button>
+      <select aria-label="Overlay position" value={overlay.position} disabled={busy||!connected} onChange={e=>update({position:e.target.value as 'top'|'bottom'})}><option value="bottom">Bottom</option><option value="top">Top</option></select>
+      <label>Height <input type="number" aria-label="Overlay height" min={40} max={160} value={overlay.height} disabled={busy||!connected} onChange={e=>update({height:Number(e.target.value)})}/></label>
+      <label>Opacity <input type="range" aria-label="Overlay opacity" min={.2} max={1} step={.05} value={overlay.opacity} disabled={busy||!connected} onChange={e=>update({opacity:Number(e.target.value)})}/></label>
+      <label><input type="checkbox" checked={overlay.clickThrough} disabled={busy||!connected} onChange={e=>update({clickThrough:e.target.checked})}/>Click through</label>
+      <label><input type="checkbox" checked={overlay.reserve} disabled={busy||!connected} onChange={e=>update({reserve:e.target.checked})}/>Reserve space</label>
+    </div>
+    {(notice||view?.cache.overlayStatus)&&<p role="status">{notice||view?.cache.overlayStatus}</p>}
+    {overlay.enabled&&!active&&<p>Desktop ticker is not running. Install the Windows helper for this extension and start at least one managed game, then retry. The compact ticker in CFB Live works without a helper.</p>}
+    <p>Browser ticker opens a regular Chrome window without a helper. Keep it visible beside your games; always-on-top, click-through, opacity and reserved space apply to the native desktop ticker.</p>
+  </div>;
 }
 export function SportsPreferences(){
   const {view,command,busy}=useSports();const [name,setName]=useState(''),[url,setUrl]=useState('');

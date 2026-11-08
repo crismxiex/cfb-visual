@@ -1,8 +1,9 @@
 import {EspnScoreProvider,ESPN_ACCESS,ProviderError} from './espn';
 import {detectChanges} from './alerts';
 import {customService,createStreamingLauncher,DEFAULT_SERVICES} from './services';
+import {openBrowserTicker} from './browser-ticker';
 import {defaults,emptyCache,live,mexicoDate,validDate} from './types';
-import type {ScoreProvider,SportsSettings,ScoreCache,SportsView} from './types';
+import type {ScoreProvider,SportsSettings,SportsPatch,ScoreCache,SportsView} from './types';
 import type {Command,View} from '../model';
 export const SCORE_ALARM='gamedeck-cfb-refresh';
 type WindowController={request:(command:Command)=>Promise<View>};
@@ -13,6 +14,7 @@ export function createScoreboardService(api:typeof chrome,windows:WindowControll
   const scoreProvider=provider||new EspnScoreProvider(fetch,now,{read:async()=>(await api.storage.local.get('gamedeckScoreRanks')).gamedeckScoreRanks as {at:number;raw:unknown}|undefined,write:async value=>{await api.storage.local.set({gamedeckScoreRanks:value});}});
   let notify:((view:SportsView)=>Promise<string|void>)|undefined;
   let tail=Promise.resolve<unknown>(undefined);
+  let publications=Promise.resolve<unknown>(undefined);
   const selectedDate=()=>settings.date||mexicoDate(now());
   async function access(){return !!api.permissions&&await api.permissions.contains({origins:[scoreProvider.permissionOrigin||ESPN_ACCESS]});}
   async function save(){await api.storage.local.set({gamedeckSports:structuredClone(settings),gamedeckScores:structuredClone(cache)});}
@@ -23,15 +25,17 @@ export function createScoreboardService(api:typeof chrome,windows:WindowControll
     cache={...emptyCache(),...data.gamedeckScores as Partial<ScoreCache>};await schedule();
   })();return loading;}
   async function view():Promise<SportsView>{await load();return {settings:structuredClone(settings),cache:structuredClone(cache),access:await access(),accessOrigin:scoreProvider.permissionOrigin||ESPN_ACCESS};}
-  async function publish(){
-    if(notify){try{const status=await notify(await view());if(status)cache.overlayStatus=status;}catch(error){cache.overlayStatus=error instanceof Error?error.message:String(error);}await api.storage.local.set({gamedeckScores:structuredClone(cache)});}
-    return view();
+  function publish(){
+    const task=publications.then(async()=>{
+      if(notify){try{const status=await notify(await view());if(status)cache.overlayStatus=status;}catch(error){cache.overlayStatus=`Desktop ticker unavailable: ${error instanceof Error?error.message:String(error)}`;}await api.storage.local.set({gamedeckScores:structuredClone(cache)});}
+      return view();
+    });publications=task.catch(()=>{});return task;
   }
   async function refresh(force=false):Promise<SportsView>{
     await load();const date=selectedDate();if(flights.has(date))return flights.get(date)!;
     if(!settings.enabled||!force&&now()<cache.nextPollAt)return view();
     const task=(async()=>{
-      if(!await access()){cache.error='Enable score access to site.api.espn.com to fetch the CFB scoreboard.';cache.nextPollAt=now()+300000;await save();await schedule();return view();}
+      if(!await access()){cache.error='Enable score access to site.api.espn.com to fetch the CFB scoreboard.';cache.nextPollAt=now()+300000;await save();await schedule();return publish();}
       cache.attemptAt=now();
       try{
         const result=await scoreProvider.fetchScores(date);if(selectedDate()!==date)return view();
@@ -48,8 +52,10 @@ export function createScoreboardService(api:typeof chrome,windows:WindowControll
     await load();
     if(message.type==='SPORTS_GET')return view();
     if(message.type==='SPORTS_REFRESH')return refresh(true);
+    if(message.type==='SPORTS_RETRY_OVERLAY')return publish();
+    if(message.type==='SPORTS_BROWSER_TICKER')return openBrowserTicker(api,windows,settings.overlay.position);
     if(message.type==='SPORTS_SETTINGS'){
-      const p=message.patch as Partial<SportsSettings>||{};
+      const p=message.patch as SportsPatch||{};
       if(p.date!==undefined&&p.date!==''&&!validDate(p.date))throw new Error('Choose a valid date.');
       const oldDate=selectedDate();
       for(const key of ['enabled','alertsEnabled','rankedOnly'] as const)if(typeof p[key]==='boolean')settings[key]=p[key]!;
@@ -81,5 +87,5 @@ export function createScoreboardService(api:typeof chrome,windows:WindowControll
     }else throw new Error('Unknown Sports Hub command.');
     return publish();
   }
-  return {request(message:Command){if(message.type==='SPORTS_GET'||message.type==='SPORTS_REFRESH')return dispatch(message);const task=tail.then(()=>dispatch(message));tail=task.catch(()=>{});return task;},refresh,view,onChange(callback:(view:SportsView)=>Promise<string|void>){notify=callback;},async startup(){await load();await schedule();if(settings.enabled&&cache.nextPollAt<=now())await refresh();}};
+  return {request(message:Command){if(message.type==='SPORTS_GET'||message.type==='SPORTS_REFRESH')return dispatch(message);const task=tail.then(()=>dispatch(message));tail=task.catch(()=>{});return task;},refresh,view,onChange(callback:(view:SportsView)=>Promise<string|void>){notify=callback;},async startup(){await load();await schedule();if(settings.enabled&&cache.nextPollAt<=now())await refresh();else await publish();}};
 }

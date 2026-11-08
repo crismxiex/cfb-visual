@@ -46,6 +46,12 @@ export function createController(api: typeof chrome) {
     deck.games.sort((a,b)=>a.slot-b.slot);
   }
   function remember() { deck.previous=snapshot(); }
+  async function beforeDisplayChange(displayId:string) {
+    if(displayId===deck.displayId)return;
+    if(runtime.scoreOverlay?.active){await native.overlay({enabled:false});runtime.scoreOverlay.active=false;runtime.overlayStatus='Ticker hidden before changing monitors. Use Retry ticker to place it on the new display.';}
+    if(runtime.immersive||runtime.scoreOverlay)await native.restoreWindows();
+    if(runtime.immersive){runtime.immersive=false;runtime.nativeStatus='Immersive mode exited before changing monitors. Enable it again to validate the new display.';}
+  }
   async function apply() {
     if (!deck.games.length) { runtime.arranged=false; return; }
     const monitors=await screens();
@@ -90,11 +96,16 @@ export function createController(api: typeof chrome) {
     }
     runtime.arranged=true;
   }
-  async function load() {
+  async function replaceBinding(message:Command) {
+    const binding=Object.values(runtime.bindings).find(b=>b.tabId===message.removedTabId);
+    if(binding){const tab=await api.tabs.get(Number(message.addedTabId));binding.tabId=tab.id!;binding.windowId=tab.windowId;}
+  }
+  async function load(message:Command) {
     if(deck) return;
     deck={ ...emptyDeck(),...(await api.storage.local.get('gamedeck')).gamedeck as Partial<Deck> };
     if(!deck.geometryVersion){deck.gap=0;deck.geometryVersion=1;}
     runtime={ ...emptyRuntime(),...(await api.storage.session.get('gamedeck')).gamedeck as Partial<Runtime> };
+    if(message.type==='TAB_REPLACED')await replaceBinding(message);
     const hadReservation=runtime.scoreOverlay?.active&&runtime.scoreOverlay.reserve;
     if(runtime.scoreOverlay)runtime.scoreOverlay.active=false;
     if(runtime.immersive){runtime.immersive=false;runtime.nativeStatus='The prior helper connection ended; native windows restore when it disconnects. Enable immersive mode again to pair current windows.';}
@@ -102,7 +113,7 @@ export function createController(api: typeof chrome) {
     deck.displayId ||= (displays.find(d=>d.isPrimary)||displays[0])?.id || '';
     deck.games.sort((a,b)=>a.slot-b.slot);
     const initial=await refresh();
-    await audio.sync(initial.tabs,true);
+    if(message.type!=='TAB_REPLACED'||runtime.audio.mode==='preserve')await audio.sync(initial.tabs,true);
     if(hadReservation)await apply();
     await persist();
   }
@@ -131,17 +142,16 @@ export function createController(api: typeof chrome) {
     await api.tabs.update(binding.tabId,{pinned:binding.originalPinned,autoDiscardable:binding.originalDiscardable});
   }
   async function dispatch(message: Command): Promise<View> {
-    await load();
+    await load(message);
     const managedTabClosed=message.type==='TAB_CLOSED'&&Object.values(runtime.bindings).some(b=>b.tabId===message.tabId);
-    if(message.type==='TAB_REPLACED'){
-      const binding=Object.values(runtime.bindings).find(b=>b.tabId===message.removedTabId);
-      if(binding){const tab=await api.tabs.get(Number(message.addedTabId));binding.tabId=tab.id!;binding.windowId=tab.windowId;}
-    }
+    if(message.type==='TAB_REPLACED')await replaceBinding(message);
     const priorBindings=Object.keys(runtime.bindings);
     const inventoryBefore=await refresh();
     if(runtime.immersive)for(const key of priorBindings)if(!runtime.bindings[key])await native.release(key);
     const previousMain=mainGameKey(deck);
-    await audio.sync(inventoryBefore.tabs);
+    // Replacement tabs must inherit the existing audio choice before their new
+    // mute flag is allowed to reconcile that choice into a silent state.
+    if(message.type!=='TAB_REPLACED')await audio.sync(inventoryBefore.tabs);
     const key=String(message.key||'');
     if(['LAYOUT','NEXT_LAYOUT','PREVIOUS','LOAD_PRESET','DISPLAY_MODE'].includes(message.type))runtime.layoutNotice='';
     try {
@@ -197,8 +207,7 @@ export function createController(api: typeof chrome) {
         remember(); deck.layout=next;deck.custom=custom;deck.games.forEach((g,i)=>g.slot=i);await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='DISPLAY') {
         if(!(await screens()).some(d=>d.id===message.displayId)) throw new Error('That display is disconnected.');
-        if(runtime.scoreOverlay?.active){await native.overlay({enabled:false});runtime.scoreOverlay.active=false;if(!runtime.immersive)await native.restoreWindows();runtime.overlayStatus='Ticker hidden before changing monitors. Toggle it to validate the new display.';}
-        if(runtime.immersive){await native.restoreWindows();runtime.immersive=false;runtime.nativeStatus='Immersive mode exited before changing monitors. Enable it again to validate the new display.';}
+        await beforeDisplayChange(String(message.displayId));
         remember();deck.displayId=String(message.displayId);await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='SWAP' || message.type==='PROMOTE' || message.type==='MOVE_SLOT') {
         const game=deck.games.find(g=>g.key===key);
@@ -263,7 +272,7 @@ export function createController(api: typeof chrome) {
         else{deck.audioEnabled=true;await audio.select(mainGameKey(deck)&&runtime.bindings[mainGameKey(deck)!]?mainGameKey(deck):Object.keys(runtime.bindings)[0]||null);}
       } else if(message.type==='TAB_REPLACED') {
         const entry=Object.entries(runtime.bindings).find(([,b])=>b.tabId===message.addedTabId);
-        if(entry&&deck.audioEnabled)await audio.write(entry[1],runtime.audio.mode==='silent'||runtime.audio.key!==entry[0]);
+        if(entry&&deck.audioEnabled){if(runtime.audio.mode==='solo'&&runtime.audio.key===entry[0])await audio.select(entry[0]);else await audio.write(entry[1],true);}
       } else if(message.type==='DISPLAY_MODE') {
         if(!['workArea','full'].includes(String(message.mode)))throw new Error('Choose Respect taskbar or Fill entire display.');
         const monitor=(await screens()).find(d=>d.id===deck.displayId);if(!monitor)throw new Error('Choose an available monitor.');
@@ -281,6 +290,7 @@ export function createController(api: typeof chrome) {
         const screen=(await screens()).find(d=>d.id===deck.previous!.displayId);
         if(!screen)throw new Error('The previous display is disconnected.');
         if(calculateLayout(displayArea(screen,deck.previous.displayMode||'workArea',runtime.scoreOverlay),deck.previous.layout,deck.previous.gap,deck.previous.custom).length<deck.games.length)throw new Error('The previous arrangement has too few slots for the current lineup.');
+        await beforeDisplayChange(deck.previous.displayId);
         const current=snapshot();restoreSnapshot(deck.previous);deck.previous=current;await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='MINIMIZE' || message.type==='MINIMIZE_SECONDARY' || message.type==='RESTORE_WINDOW') {
         const games=deck.games.filter(g=>message.type==='MINIMIZE_SECONDARY'?g.slot!==0:g.key===key);
@@ -309,6 +319,7 @@ export function createController(api: typeof chrome) {
         const screen=(await screens()).find(d=>d.id===p.displayId);
         if(!screen)throw new Error('The saved display is disconnected. Choose another arrangement.');
         if(calculateLayout(displayArea(screen,p.displayMode||'workArea',runtime.scoreOverlay),p.layout,p.gap,p.custom).length<deck.games.length)throw new Error('This saved layout has too few slots for your current lineup.');
+        await beforeDisplayChange(p.displayId);
         remember();restoreSnapshot(p);await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='DELETE_PRESET') deck.presets=deck.presets.filter(p=>p.id!==message.id);
       else if(message.type==='GAP') {if(![0,2,4,8].includes(Number(message.gap)))throw new Error('Choose a gap of 0, 2, 4, or 8 pixels.');deck.gap=Number(message.gap);await audio.mainChanged(previousMain);await apply();}

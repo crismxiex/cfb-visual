@@ -7,6 +7,7 @@ export type EventLink={provider:string;eventId:string;confirmedAt:number};
 export type StreamShortcut={id:string;name:string;url:string;domain:string};
 export type OverlaySettings={enabled:boolean;position:'top'|'bottom';height:number;opacity:number;clickThrough:boolean;reserve:boolean;eventIds:string[]};
 export type SportsSettings={enabled:boolean;date:string;filter:string;status:string;query:string;rankedOnly?:boolean;mode:'expanded'|'compact';favorites:string[];links:Record<string,EventLink>;alertsEnabled:boolean;mutedEvents:string[];services:StreamShortcut[];overlay:OverlaySettings};
+export type SportsPatch=Omit<Partial<SportsSettings>,'overlay'>&{overlay?:Partial<OverlaySettings>};
 export type ScoreAlert={id:string;eventId:string;message:string;at:number};
 export type ScoreCache={events:ScoreEvent[];date:string;updatedAt:number;attemptAt:number;nextPollAt:number;failures:number;error:string;coverageWarning:string;rankLabel:string;providerName:string;attributionUrl:string;alerts:ScoreAlert[];overlayStatus:string};
 export type SportsView={settings:SportsSettings;cache:ScoreCache;access:boolean;accessOrigin?:string};
