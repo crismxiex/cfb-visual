@@ -1,7 +1,8 @@
 export type Rect = { left: number; top: number; width: number; height: number };
 export type LayoutId = 'single' | 'two-equal' | 'two-main' | 'three-main' | 'three-horizontal' | 'four-grid' | 'four-main' | 'six-grid' | 'custom';
-export type Game = { key: string; title: string; url: string; slot: number; teams?: string; score?: string };
-export type Binding = { tabId: number; windowId: number; originalWindowId: number; originalIndex: number; originalBounds: Rect; originalPinned: boolean; originalDiscardable: boolean; originalMuted?: boolean; lastAudioWrite?: boolean; manualAudioOverride?: boolean; playerViewEnabled?: boolean; managed: boolean };
+export type Game = { key: string; title: string; url: string; slot: number; teams?: string; score?: string; volume?: number; lastAudibleVolume?: number };
+export type PlayerAudio = { available: boolean; volume?: number; muted?: boolean; status: string };
+export type Binding = { tabId: number; windowId: number; originalWindowId: number; originalIndex: number; originalBounds: Rect; originalPinned: boolean; originalDiscardable: boolean; originalMuted?: boolean; lastAudioWrite?: boolean; manualAudioOverride?: boolean; playerViewEnabled?: boolean; playerAudio?: PlayerAudio; managed: boolean };
 export type Snapshot = { layout: LayoutId; displayId: string; order: string[]; positions: Record<string,number>; custom: { columns: number; rows: number }; gap: number; displayMode?: 'workArea' | 'full' };
 export type Preset = Snapshot & { id: string; name: string };
 export type Deck = { games: Game[]; layout: LayoutId; displayId: string; gap: number; geometryVersion?: number; displayMode: 'workArea' | 'full'; playerFit: 'contain' | 'cover'; audioEnabled: boolean; audioFollowsMain: boolean; selected: string | null; presets: Preset[]; previous?: Snapshot; custom: { columns: number; rows: number } };

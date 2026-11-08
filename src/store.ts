@@ -11,7 +11,7 @@ export const useDeck=create<Store>((set,get)=>({
   },
   send:async command=>{
     if(!get().connected){set({error:'Load the built dist folder as an unpacked Chrome extension to control real windows.'});return false;}
-    if(get().busy&&!['SELECT','LISTEN','MUTE_ALL','TOGGLE_MUTE'].includes(command.type)) return false;
+    if(get().busy&&!['SELECT','LISTEN','MUTE_ALL','TOGGLE_MUTE','SET_VOLUME'].includes(command.type)) return false;
     pending++;
     set({busy:true,error:''});
     try {const r=await chrome.runtime.sendMessage(command);if(!r.ok) throw new Error(r.error);set({view:r.data});return true;}

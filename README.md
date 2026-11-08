@@ -2,6 +2,8 @@
 
 GameDeck arranges your existing, signed-in Chrome sports tabs as real independent popup windows. The React dashboard is a layout map and control panel. Your original streaming pages continue running in the same Chrome profile; no video is captured, embedded, mirrored, proxied, or retransmitted.
 
+**New in v2.4.1 — Player volume:** per-game volume sliders and player unmuting from the Command Center. Reload the extension, then click **Enable volume controls** once to grant access for your managed providers. Listen and audio switching recover muted players without opening their windows.
+
 **New in v2.4 — Sports Hub:** Disney+ and DAZN Mexico launchers; real FBS score cards/ticker, favorites, confirmed event-to-window linking, score-card audio/main controls, in-tile scores and an optional native desktop ticker. See [Sports Hub setup, provider research, architecture and verification](docs/SPORTS-HUB.md). The completed provider was checked against the live feed; the optional native overlay was compiled but Windows denied executing its rebuilt helper. Open **CFB Live → Enable CFB scores** after reloading the extension. Chrome 120+ is required.
 
 ## Windows 11 setup
@@ -80,7 +82,9 @@ All audio requests run through a serialized controller. It validates the target,
 
 Manual Chrome mute events are observed. Muting the active game enters silence without repeatedly unmuting it. Manually unmuting another managed tab designates it and mutes the others. Events from this extension are recognized and ignored, preventing feedback loops. Turning **Manage audio** off, removing a game or returning its tab restores the earlier tab mute setting only when the current state is still owned by GameDeck; newer manual choices and other extensions' choices are preserved. Unmanaged tabs are never muted.
 
-Enable sound inside the provider's own player first. Tab unmuting cannot override in-player muting. Volume and protected media remain under the original provider's control.
+Click **Enable volume controls** in the Command Center to allow optional page access for your managed Disney+, DAZN and ESPN origins. Each game then has a 0–100% player volume slider. **Listen**, tile selection and follow-main switching also unmute the original player, including recovering from zero volume at the last audible level (50% if none is known). Sliders remember each game's chosen level and do not select or reposition another window. Other managed games stay muted through Chrome's tab controls. **Mute all** keeps every managed tab silent until you choose one again.
+
+Player audio status refreshes every five seconds while the dashboard is visible; **Refresh audio** updates it immediately. Start playback first. Same-origin frames and open shadow roots are supported; inaccessible player frames show an unavailable status while ordinary Chrome mute controls keep working. No audio capture, playback restart or native helper is required. These controls change the original player's volume, not the Windows master or Chrome application mixer volume.
 
 ## Edge-to-edge arrangement
 

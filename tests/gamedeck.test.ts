@@ -32,6 +32,50 @@ function fixture() {
   return {api,tabs,windows,calls,displays,controller:createController(api),get local(){return local;},get session(){return session;},restartBrowser(){session={};},async add(id:number){return this.controller.request({type:'ADD_TAB',tabId:id});}};
 }
 
+describe('Command Center player volume',()=>{
+  function players(f:ReturnType<typeof fixture>,granted=true){
+    const states=new Map([[1,{available:true,volume:.25,muted:true,status:''}],[2,{available:true,volume:.8,muted:false,status:''}]]);
+    f.api.permissions={contains:async()=>granted};
+    f.api.scripting={executeScript:async(p:any)=>{
+      f.calls.push(['player',p.target.tabId,...p.args]);const state=states.get(p.target.tabId)!;
+      const [action,volume]=p.args;
+      if(action==='listen'){state.volume=volume>0?volume:state.volume||.5;state.muted=false;}
+      if(action==='volume'){state.volume=volume;state.muted=volume===0;}
+      return [{frameId:0,result:{...state}}];
+    }};
+    for(const id of [1,2])f.tabs.get(id).url='https://www.dazn.com/watch/'+id;
+    return states;
+  }
+  it('unmutes the chosen player before its tab, after muting other games, without moving windows',async()=>{
+    const f=fixture();const media=players(f);await f.add(1);const v=await f.add(2);media.get(2)!.muted=true;f.calls.length=0;
+    const r=await f.controller.request({type:'SELECT',key:v.deck.games[1].key});
+    expect(media.get(2)!.muted).toBe(false);expect(r.runtime.bindings[v.deck.games[1].key].playerAudio?.volume).toBe(.8);
+    const mute=f.calls.findIndex(c=>c[0]==='tabs.update'&&c[1]===1&&c[2].muted===true),player=f.calls.findIndex(c=>c[0]==='player'&&c[1]===2),unmute=f.calls.findIndex(c=>c[0]==='tabs.update'&&c[1]===2&&c[2].muted===false);
+    expect(player).toBeGreaterThan(mute);expect(unmute).toBeGreaterThan(player);expect(f.calls.some(c=>c[0].startsWith('windows.'))).toBe(false);
+  });
+  it('restores the last audible level after zero volume, even when only the player is muted',async()=>{
+    const f=fixture();players(f);const v=await f.add(1),key=v.deck.games[0].key;
+    await f.controller.request({type:'SET_VOLUME',key,volume:.37});await f.controller.request({type:'SET_VOLUME',key,volume:0});
+    const r=await f.controller.request({type:'TOGGLE_MUTE',key});expect(r.runtime.bindings[key].playerAudio).toMatchObject({volume:.37,muted:false});expect(f.tabs.get(1).mutedInfo.muted).toBe(false);
+  });
+  it('changing a secondary volume preserves exclusive selection and geometry; choices survive restart',async()=>{
+    const f=fixture();players(f);await f.add(1);const v=await f.add(2),key=v.deck.games[1].key;f.calls.length=0;
+    const changed=await f.controller.request({type:'SET_VOLUME',key,volume:.42});expect(changed.runtime.audio.key).toBe(v.runtime.audio.key);expect(f.tabs.get(2).mutedInfo.muted).toBe(true);expect(f.calls.some(c=>c[0].startsWith('windows.'))).toBe(false);
+    const restarted=createController(f.api);const r=await restarted.request({type:'LISTEN',key});expect(r.runtime.bindings[key].playerAudio?.volume).toBe(.42);expect(f.local.gamedeck.games[1].volume).toBe(.42);
+  });
+  it('does not inject without optional access and keeps ordinary tab selection working',async()=>{
+    const f=fixture();players(f,false);const v=await f.add(1),key=v.deck.games[0].key;f.calls.length=0;
+    const r=await f.controller.request({type:'LISTEN',key});expect(r.runtime.audio.key).toBe(key);expect(f.calls.some(c=>c[0]==='player')).toBe(false);expect(r.runtime.bindings[key].playerAudio?.available).toBe(false);
+    await expect(f.controller.request({type:'SET_VOLUME',key,volume:.5})).rejects.toThrow(/Enable volume controls/);
+  });
+  it('reports missing players, validates requests and keeps mute-all silent after a volume change',async()=>{
+    const f=fixture();players(f);const v=await f.add(1),key=v.deck.games[0].key;
+    for(const volume of [-1,NaN,2,'0.5'])await expect(f.controller.request({type:'SET_VOLUME',key,volume})).rejects.toThrow(/0 to 100/);
+    await f.controller.request({type:'MUTE_ALL'});const r=await f.controller.request({type:'SET_VOLUME',key,volume:.9});expect(r.runtime.audio.mode).toBe('silent');expect(f.tabs.get(1).mutedInfo.muted).toBe(true);
+    f.api.scripting.executeScript=async()=>[{result:{available:false,status:'Start playback first.'}}];await expect(f.controller.request({type:'SET_VOLUME',key,volume:.5})).rejects.toThrow(/Start playback/);
+  });
+});
+
 describe('display-aware layout engine',()=>{
   for(const l of layouts) it(`${l.id} stays inside a negative-origin work area without overlap`,()=>{
     const area={left:-2560,top:-200,width:2560,height:1400};const rects=calculateLayout(area,l.id,8);

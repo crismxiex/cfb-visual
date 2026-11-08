@@ -71,6 +71,27 @@ it('denied player-view permission leaves the playing tabs untouched',async()=>{
 it('Restore page controls needs no new permission request',async()=>{
   const request=await connectPlayers();const button=[...container.querySelectorAll('button')].find(b=>b.textContent==='Restore page controls')!;await act(async()=>button.click());expect(request).not.toHaveBeenCalled();expect(send).toHaveBeenCalledWith({type:'PLAYER_VIEW',enabled:false,fit:'contain'});
 });
+it('volume access requests only managed provider origins and refreshes the original players',async()=>{
+  const request=await connectPlayers();await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Enable volume controls')!.click());
+  expect(request).toHaveBeenCalledExactlyOnceWith({permissions:['scripting'],origins:['https://www.dazn.com/*','https://www.disneyplus.com/*']});expect(send).toHaveBeenCalledExactlyOnceWith({type:'AUDIO_STATUS'});
+});
+it('denied volume access leaves players unchanged and explains that tab mute remains available',async()=>{
+  await connectPlayers(false);await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Enable volume controls')!.click());expect(send).not.toHaveBeenCalled();expect(container.textContent).toContain('Chrome tab mute controls are still available');
+  expect([...container.querySelectorAll<HTMLInputElement>('input[type="range"]')].every(input=>input.disabled)).toBe(true);
+});
+it('a volume slider sends its chosen value without selecting a game or moving windows',async()=>{
+  const view=structuredClone(useDeck.getState().view!);view.runtime.bindings.g2.playerAudio={available:true,volume:.6,muted:false,status:''};
+  await act(async()=>useDeck.setState({view}));
+  const input=container.querySelector<HTMLInputElement>('[aria-label="Volume for Game 2"]')!;
+  expect(input.disabled).toBe(false);expect(input.value).toBe('60');
+  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'35');input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await act(async()=>input.dispatchEvent(new KeyboardEvent('keyup',{key:'ArrowLeft',bubbles:true})));
+  expect(send).toHaveBeenCalledExactlyOnceWith({type:'SET_VOLUME',key:'g2',volume:.35});
+});
+it('an in-player mute is shown in the Command Center even if Chrome has the tab unmuted',async()=>{
+  const view=structuredClone(useDeck.getState().view!);view.runtime.bindings.g1.playerAudio={available:true,volume:.4,muted:true,status:''};await act(async()=>useDeck.setState({view}));
+  expect(container.querySelector('[aria-label="Unmute Game 1"]')).not.toBeNull();expect(tile(1).querySelector('[aria-label="Tab muted"]')).not.toBeNull();
+});
 async function scores(linked=true){
   const settings=defaults();settings.enabled=true;if(linked)settings.links.g3={provider:'espn',eventId:'99',confirmedAt:1};
   const cache=emptyCache();cache.date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());cache.updatedAt=Date.now();cache.events=[{id:'99',provider:'espn',name:'BYU Cougars at Utah Utes',date:new Date().toISOString(),home:{id:'254',name:'Utah Utes',shortName:'Utah',abbreviation:'UTAH',score:14},away:{id:'252',name:'BYU Cougars',shortName:'BYU',abbreviation:'BYU',score:7},status:'live',statusText:'Q3 · 8:00',quarter:3,clock:'8:00',networks:[]}];

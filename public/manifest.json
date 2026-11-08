@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GameDeck — Sports Window Manager",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "minimum_chrome_version": "120",
   "description": "Arrange your existing signed-in Chrome sports tabs into real windows. Local window management with no video capture.",
   "permissions": ["tabs", "storage", "system.display", "alarms"],

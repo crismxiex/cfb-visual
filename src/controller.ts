@@ -214,11 +214,15 @@ export function createController(api: typeof chrome) {
         const keys=Object.entries(runtime.bindings).filter(([,b])=>b.playerViewEnabled).map(([key])=>key);
         if(keys.length)await playerView.set(true,deck.playerFit,keys,true);
       } else if(message.type==='LISTEN') await audio.select(key);
+      else if(message.type==='AUDIO_STATUS') await audio.status();
+      else if(message.type==='SET_VOLUME') await audio.volume(key,message.volume);
       else if(message.type==='MUTE_ALL') await audio.select(null);
       else if(message.type==='TOGGLE_MUTE') {
         const binding=runtime.bindings[key];if(!binding)throw new Error('This game is unavailable.');
         const tab=await api.tabs.get(binding.tabId);
-        if(tab.mutedInfo?.muted)await audio.select(key);else await audio.select(null);
+        await audio.status();
+        const player=binding.playerAudio;
+        if(tab.mutedInfo?.muted||player?.muted||player?.volume===0)await audio.select(key);else await audio.select(null);
       } else if(message.type==='AUDIO_CHANGED') {await audio.changed(Number(message.tabId),message.mutedInfo as chrome.tabs.MutedInfo);
       } else if(message.type==='SCORE_OVERLAY') {
         if(!message.enabled){
