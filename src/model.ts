@@ -5,16 +5,19 @@ export type Binding = { tabId: number; windowId: number; originalWindowId: numbe
 export type Snapshot = { layout: LayoutId; displayId: string; order: string[]; positions: Record<string,number>; custom: { columns: number; rows: number }; gap: number; displayMode?: 'workArea' | 'full' };
 export type Preset = Snapshot & { id: string; name: string };
 export type Deck = { games: Game[]; layout: LayoutId; displayId: string; gap: number; geometryVersion?: number; displayMode: 'workArea' | 'full'; playerFit: 'contain' | 'cover'; audioEnabled: boolean; audioFollowsMain: boolean; selected: string | null; presets: Preset[]; previous?: Snapshot; custom: { columns: number; rows: number } };
-export type Runtime = { bindings: Record<string, Binding>; warnings: string[]; arranged: boolean; audio: { mode: 'preserve' | 'solo' | 'silent'; key: string | null }; immersive: boolean; nativeStatus: string; playerViewReport: string; layoutNotice: string };
+export type OverlayReservation={active:boolean;reserve:boolean;height:number;position:'top'|'bottom'};
+export type Runtime = { bindings: Record<string, Binding>; warnings: string[]; arranged: boolean; audio: { mode: 'preserve' | 'solo' | 'silent'; key: string | null }; immersive: boolean; nativeStatus: string; playerViewReport: string; layoutNotice: string; scoreOverlay?:OverlayReservation; overlayStatus?:string };
 export type Display = { id: string; name: string; isPrimary: boolean; workArea: Rect; bounds?: Rect };
 export type View = { deck: Deck; runtime: Runtime; tabs: chrome.tabs.Tab[]; windows: chrome.windows.Window[]; displays: Display[] };
 export type Command = { type: string; [key: string]: unknown };
 export const emptyDeck = (): Deck => ({ games: [], layout: 'three-main', displayId: '', gap: 0, displayMode: 'workArea', playerFit: 'contain', audioEnabled: true, audioFollowsMain: true, selected: null, presets: [], custom: { columns: 2, rows: 2 } });
 export const emptyRuntime = (): Runtime => ({ bindings: {}, warnings: [], arranged: false, audio: { mode: 'preserve', key: null }, immersive: false, nativeStatus: '', playerViewReport: '', layoutNotice: '' });
 export const mainGameKey = (deck: Deck) => deck.games.find(g=>g.slot===0)?.key ?? null;
-export function displayArea(display: Display, mode: Deck['displayMode']): Rect {
+export function displayArea(display: Display, mode: Deck['displayMode'],overlay?:OverlayReservation): Rect {
   if(mode==='full'&&!display.bounds)throw new Error('Chrome did not report full display bounds. Use Respect taskbar.');
-  return mode==='full'?display.bounds!:display.workArea;
+  const area=mode==='full'?display.bounds!:display.workArea;
+  if(overlay?.active&&overlay.reserve)return {...area,top:area.top+(overlay.position==='top'?overlay.height:0),height:area.height-overlay.height};
+  return area;
 }
 
 export function normalizeUrl(raw: string): string {

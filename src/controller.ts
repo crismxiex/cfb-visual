@@ -2,6 +2,8 @@ import { createAudioController } from './audio-controller';
 import { createNativeManager } from './native';
 import { calculateLayout, layoutForAddition, layouts } from './layout';
 import { createPlayerViewController } from './player-view-controller';
+import type {OverlaySettings,ScoreEvent} from './sports/types';
+import {scoreText} from './sports/types';
 import { displayArea, mainGameKey, durableUrl, emptyDeck, emptyRuntime, normalizeUrl, provider, reconcile } from './model';
 import type { Binding, Command, Deck, Display, LayoutId, Runtime, Snapshot, View } from './model';
 
@@ -10,7 +12,7 @@ export function createController(api: typeof chrome) {
   let queue = Promise.resolve<unknown>(undefined);
   const audio=createAudioController(api,()=>deck,()=>runtime);
   const playerView=createPlayerViewController(api,()=>deck,()=>runtime);
-  const native=createNativeManager(api,reason=>{if(runtime){runtime.immersive=false;runtime.nativeStatus=reason;void api.storage.session.set({gamedeck:structuredClone(runtime)}).catch(console.error);}});
+  const native=createNativeManager(api,reason=>{if(runtime){const reserved=runtime.scoreOverlay?.active&&runtime.scoreOverlay.reserve;runtime.immersive=false;runtime.nativeStatus=reason;if(runtime.scoreOverlay)runtime.scoreOverlay.active=false;runtime.overlayStatus=reason;queue=queue.then(async()=>{if(reserved)await apply();await persist();}).catch(console.error);}});
   const persist = async () => {
     await api.storage.local.set({ gamedeck: structuredClone(deck) });
     await api.storage.session.set({ gamedeck: structuredClone(runtime) });
@@ -49,7 +51,7 @@ export function createController(api: typeof chrome) {
     const monitors=await screens();
     const display=monitors.find(d=>d.id===deck.displayId);
     if(!display) throw new Error('The selected display is disconnected. Choose an available monitor.');
-    const bounds=calculateLayout(displayArea(display,deck.displayMode),deck.layout,deck.gap,deck.custom);
+    const bounds=calculateLayout(displayArea(display,deck.displayMode,runtime.scoreOverlay),deck.layout,deck.gap,deck.custom);
     if(deck.games.length>bounds.length || deck.games.some(g=>g.slot>=bounds.length)) throw new Error(`This layout has ${bounds.length} slots for your assigned games. Choose a larger layout or move games to earlier slots first.`);
     runtime.warnings=[];
     for (const game of deck.games) {
@@ -80,7 +82,7 @@ export function createController(api: typeof chrome) {
           if(result?.adjusted)runtime.warnings.push(`${game.title}: Windows or Chrome adjusted native bounds. Exit immersive mode if the windows do not align.`);
         }else if((['left','top','width','height'] as const).some(k=>(actual[k]??target[k])!==target[k])) runtime.warnings.push(`${game.title}: Chrome or Windows adjusted the requested bounds. Use fewer slots or a larger display if windows overlap.`);
       } catch(error) {
-        if(runtime.immersive){await native.stop().catch(console.error);runtime.immersive=false;runtime.nativeStatus='Native placement failed. Paired windows restore their original styles and geometry.';}
+        if(runtime.immersive){await native.restoreWindows().catch(console.error);runtime.immersive=false;runtime.nativeStatus='Native placement failed. Paired windows restore their original styles and geometry.';}
         runtime.warnings.push(`${game.title}: ${error instanceof Error ? error.message : String(error)}`);
         await persist();
         throw new Error(runtime.warnings.at(-1));
@@ -93,12 +95,15 @@ export function createController(api: typeof chrome) {
     deck={ ...emptyDeck(),...(await api.storage.local.get('gamedeck')).gamedeck as Partial<Deck> };
     if(!deck.geometryVersion){deck.gap=0;deck.geometryVersion=1;}
     runtime={ ...emptyRuntime(),...(await api.storage.session.get('gamedeck')).gamedeck as Partial<Runtime> };
+    const hadReservation=runtime.scoreOverlay?.active&&runtime.scoreOverlay.reserve;
+    if(runtime.scoreOverlay)runtime.scoreOverlay.active=false;
     if(runtime.immersive){runtime.immersive=false;runtime.nativeStatus='The prior helper connection ended; native windows restore when it disconnects. Enable immersive mode again to pair current windows.';}
     const displays=await screens();
     deck.displayId ||= (displays.find(d=>d.isPrimary)||displays[0])?.id || '';
     deck.games.sort((a,b)=>a.slot-b.slot);
     const initial=await refresh();
     await audio.sync(initial.tabs,true);
+    if(hadReservation)await apply();
     await persist();
   }
   async function focus(key: string) {
@@ -160,7 +165,7 @@ export function createController(api: typeof chrome) {
             if(!screen) throw new Error('Choose an available viewing monitor first.');
             let slot=game?.slot??0;while(!game&&deck.games.some(g=>g.slot===slot))slot++;
             const requiredSlots=Math.max(slot+1,...deck.games.map(g=>g.slot+1));
-            const next=layoutForAddition(displayArea(screen,deck.displayMode),deck.layout,requiredSlots,deck.gap,deck.custom);
+            const next=layoutForAddition(displayArea(screen,deck.displayMode,runtime.scoreOverlay),deck.layout,requiredSlots,deck.gap,deck.custom);
             if(!tab) {
               const win=await api.windows.create({url,type:'popup',focused:false});
               if(win?.id==null) throw new Error('Chrome could not open this URL.');
@@ -188,18 +193,19 @@ export function createController(api: typeof chrome) {
         const display=(await screens()).find(d=>d.id===deck.displayId);
         if(!display) throw new Error('Choose a connected monitor.');
         const custom=message.custom as Deck['custom']||deck.custom;
-        if(calculateLayout(displayArea(display,deck.displayMode),next,deck.gap,custom).length<deck.games.length) throw new Error('This layout has too few slots for your lineup.');
+        if(calculateLayout(displayArea(display,deck.displayMode,runtime.scoreOverlay),next,deck.gap,custom).length<deck.games.length) throw new Error('This layout has too few slots for your lineup.');
         remember(); deck.layout=next;deck.custom=custom;deck.games.forEach((g,i)=>g.slot=i);await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='DISPLAY') {
         if(!(await screens()).some(d=>d.id===message.displayId)) throw new Error('That display is disconnected.');
-        if(runtime.immersive){await native.stop();runtime.immersive=false;runtime.nativeStatus='Immersive mode exited before changing monitors. Enable it again to validate the new display.';}
+        if(runtime.scoreOverlay?.active){await native.overlay({enabled:false});runtime.scoreOverlay.active=false;if(!runtime.immersive)await native.restoreWindows();runtime.overlayStatus='Ticker hidden before changing monitors. Toggle it to validate the new display.';}
+        if(runtime.immersive){await native.restoreWindows();runtime.immersive=false;runtime.nativeStatus='Immersive mode exited before changing monitors. Enable it again to validate the new display.';}
         remember();deck.displayId=String(message.displayId);await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='SWAP' || message.type==='PROMOTE' || message.type==='MOVE_SLOT') {
         const game=deck.games.find(g=>g.key===key);
         const target=message.type==='PROMOTE'?0:message.type==='MOVE_SLOT'?Number(message.slot):deck.games.find(g=>g.key===message.other)?.slot;
         const display=(await screens()).find(d=>d.id===deck.displayId);
-        if(!game||target==null||!Number.isInteger(target)||target<0||!display||target>=calculateLayout(displayArea(display,deck.displayMode),deck.layout,deck.gap,deck.custom).length) throw new Error('Choose an available layout position.');
-        remember();const other=deck.games.find(g=>g.slot===target);if(other)other.slot=game.slot;game.slot=target;deck.games.sort((a,b)=>a.slot-b.slot);await audio.mainChanged(previousMain);await apply();
+        if(!game||target==null||!Number.isInteger(target)||target<0||!display||target>=calculateLayout(displayArea(display,deck.displayMode,runtime.scoreOverlay),deck.layout,deck.gap,deck.custom).length) throw new Error('Choose an available layout position.');
+        remember();const other=deck.games.find(g=>g.slot===target);if(other)other.slot=game.slot;game.slot=target;deck.games.sort((a,b)=>a.slot-b.slot);if(message.forceAudio&&deck.audioEnabled)await audio.select(game.key);else await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='PLAYER_VIEW') {
         const keys=Array.isArray(message.keys)?message.keys.map(String):undefined;
         await playerView.set(!!message.enabled,(message.fit||deck.playerFit) as Deck['playerFit'],keys);
@@ -214,16 +220,38 @@ export function createController(api: typeof chrome) {
         const tab=await api.tabs.get(binding.tabId);
         if(tab.mutedInfo?.muted)await audio.select(key);else await audio.select(null);
       } else if(message.type==='AUDIO_CHANGED') {await audio.changed(Number(message.tabId),message.mutedInfo as chrome.tabs.MutedInfo);
+      } else if(message.type==='SCORE_OVERLAY') {
+        if(!message.enabled){
+          if(runtime.scoreOverlay?.active){await native.overlay({enabled:false});runtime.scoreOverlay.active=false;if(!runtime.immersive)await native.restoreWindows();await apply();}
+          runtime.overlayStatus='Native score ticker hidden.';
+        }else{
+          const options=message.settings as OverlaySettings;
+          if(!options||!Number.isFinite(options.height)||options.height<40||options.height>160||!Number.isFinite(options.opacity)||options.opacity<.2||options.opacity>1||!['top','bottom'].includes(options.position))throw new Error('Choose valid ticker geometry and opacity.');
+          const display=(await screens()).find(d=>d.id===deck.displayId);
+          const anchor=deck.games.find(g=>runtime.bindings[g.key]);
+          if(!display?.bounds||!anchor)throw new Error('Add and arrange at least one game to verify the native ticker’s monitor.');
+          const reservation={active:true,reserve:!!options.reserve,height:Math.round(options.height),position:options.position};
+          calculateLayout(displayArea(display,deck.displayMode,reservation),deck.layout,deck.gap,deck.custom);
+          try{
+            if(!runtime.arranged)await apply();
+            const b=runtime.bindings[anchor.key];await native.connect(true);await native.ensurePair(anchor.key,b.tabId,b.windowId,display.bounds);
+            const lines=(message.events as ScoreEvent[]||[]).slice(0,30).map(e=>`${e.away.abbreviation} ${scoreText(e.away)} — ${e.home.abbreviation} ${scoreText(e.home)}\n${e.status==='scheduled'?new Intl.DateTimeFormat('en-US',{timeZone:'America/Mexico_City',hour:'numeric',minute:'2-digit'}).format(new Date(e.date))+' MX':e.status==='final'?'Final':e.statusText}`);
+            await native.overlay({enabled:true,anchorKey:anchor.key,settings:{...options,height:reservation.height},monitor:display.bounds,area:displayArea(display,deck.displayMode),lines,freshness:String(message.freshness||'')});
+            const previous=runtime.scoreOverlay;runtime.scoreOverlay=reservation;
+            if((previous?.reserve||reservation.reserve)&&JSON.stringify(previous)!==JSON.stringify(reservation))await apply();
+            runtime.overlayStatus=`Native ticker visible${reservation.reserve?' · viewing area reserved':' · floating above games'}${options.clickThrough?' · click-through':''}.`;
+          }catch(error){await native.overlay({enabled:false}).catch(()=>{});if(runtime.scoreOverlay)runtime.scoreOverlay.active=false;if(!runtime.immersive)await native.restoreWindows().catch(()=>{});await apply().catch(()=>{});throw error;}
+        }
       } else if(message.type==='IMMERSIVE') {
-        if(!message.enabled){await native.stop();runtime.immersive=false;runtime.nativeStatus='Original native styles and geometry restored.';}
+        if(!message.enabled){await native.restoreWindows();runtime.immersive=false;runtime.nativeStatus='Original native styles and geometry restored.';if(runtime.scoreOverlay?.active&&runtime.scoreOverlay.reserve)await apply();}
         else{
           if(!deck.games.length)throw new Error('Add a game before enabling immersive mode.');
           await apply();
           try{await native.connect();runtime.immersive=true;await apply();runtime.nativeStatus='Helper connected. Native frame reduction is best effort; Chrome may retain its custom title bar.';}
-          catch(error){await native.stop().catch(()=>{});runtime.immersive=false;runtime.nativeStatus='Immersive mode stopped; helper restores paired window styles and geometry.';throw error;}
+          catch(error){await native.restoreWindows().catch(()=>{});runtime.immersive=false;runtime.nativeStatus='Immersive mode stopped; helper restores paired window styles and geometry.';throw error;}
         }
       } else if(message.type==='DASHBOARD_CLOSED') {
-        if(runtime.immersive){await native.stop();runtime.immersive=false;runtime.nativeStatus='Dashboard closed; native window styles and geometry restored.';}
+        if(runtime.immersive){await native.restoreWindows();runtime.immersive=false;runtime.nativeStatus='Dashboard closed; native window styles and geometry restored.';if(runtime.scoreOverlay?.active&&runtime.scoreOverlay.reserve)await apply();}
       } else if(message.type==='AUDIO_FOLLOWS_MAIN') {deck.audioFollowsMain=!!message.enabled;
       } else if(message.type==='AUDIO_ENABLED') {
         const enabled=!!message.enabled;
@@ -235,7 +263,7 @@ export function createController(api: typeof chrome) {
       } else if(message.type==='DISPLAY_MODE') {
         if(!['workArea','full'].includes(String(message.mode)))throw new Error('Choose Respect taskbar or Fill entire display.');
         const monitor=(await screens()).find(d=>d.id===deck.displayId);if(!monitor)throw new Error('Choose an available monitor.');
-        calculateLayout(displayArea(monitor,message.mode as Deck['displayMode']),deck.layout,deck.gap,deck.custom);remember();deck.displayMode=message.mode as Deck['displayMode'];await apply();
+        calculateLayout(displayArea(monitor,message.mode as Deck['displayMode'],runtime.scoreOverlay),deck.layout,deck.gap,deck.custom);remember();deck.displayMode=message.mode as Deck['displayMode'];await apply();
       } else if(message.type==='SELECT') {if(deck.games.some(g=>g.key===key)){deck.selected=key;if(deck.audioEnabled)await audio.select(key);}}
       else if(message.type==='FOCUS') await focus(key);
       else if(message.type==='CYCLE_FOCUS') {
@@ -248,7 +276,7 @@ export function createController(api: typeof chrome) {
         if(!deck.previous) throw new Error('No previous arrangement yet.');
         const screen=(await screens()).find(d=>d.id===deck.previous!.displayId);
         if(!screen)throw new Error('The previous display is disconnected.');
-        if(calculateLayout(displayArea(screen,deck.previous.displayMode||'workArea'),deck.previous.layout,deck.previous.gap,deck.previous.custom).length<deck.games.length)throw new Error('The previous arrangement has too few slots for the current lineup.');
+        if(calculateLayout(displayArea(screen,deck.previous.displayMode||'workArea',runtime.scoreOverlay),deck.previous.layout,deck.previous.gap,deck.previous.custom).length<deck.games.length)throw new Error('The previous arrangement has too few slots for the current lineup.');
         const current=snapshot();restoreSnapshot(deck.previous);deck.previous=current;await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='MINIMIZE' || message.type==='MINIMIZE_SECONDARY' || message.type==='RESTORE_WINDOW') {
         const games=deck.games.filter(g=>message.type==='MINIMIZE_SECONDARY'?g.slot!==0:g.key===key);
@@ -276,7 +304,7 @@ export function createController(api: typeof chrome) {
         const p=deck.presets.find(p=>p.id===message.id);if(!p) throw new Error('Preset not found.');
         const screen=(await screens()).find(d=>d.id===p.displayId);
         if(!screen)throw new Error('The saved display is disconnected. Choose another arrangement.');
-        if(calculateLayout(displayArea(screen,p.displayMode||'workArea'),p.layout,p.gap,p.custom).length<deck.games.length)throw new Error('This saved layout has too few slots for your current lineup.');
+        if(calculateLayout(displayArea(screen,p.displayMode||'workArea',runtime.scoreOverlay),p.layout,p.gap,p.custom).length<deck.games.length)throw new Error('This saved layout has too few slots for your current lineup.');
         remember();restoreSnapshot(p);await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='DELETE_PRESET') deck.presets=deck.presets.filter(p=>p.id!==message.id);
       else if(message.type==='GAP') {if(![0,2,4,8].includes(Number(message.gap)))throw new Error('Choose a gap of 0, 2, 4, or 8 pixels.');deck.gap=Number(message.gap);await audio.mainChanged(previousMain);await apply();}

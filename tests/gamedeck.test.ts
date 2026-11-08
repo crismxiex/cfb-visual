@@ -245,3 +245,21 @@ describe('adding games automatically expands the layout',()=>{
     await f.controller.request({type:'PLAYER_VIEW',enabled:true,fit:'cover'});await f.controller.request({type:'REMOVE',key:v.deck.games[0].key});expect(calls.map(c=>c.args[0])).toEqual(['enable','restore']);expect(f.tabs.has(1)).toBe(true);
   });
 });
+
+
+describe('optional native score ticker reservation',()=>{
+  function helper(f:ReturnType<typeof fixture>){
+    const receive:((message:any)=>void)[]=[],disconnect:(()=>void)[]=[];
+    const port={onMessage:{addListener:(fn:any)=>receive.push(fn)},onDisconnect:{addListener:(fn:any)=>disconnect.push(fn)},postMessage:(message:any)=>{f.calls.push(['native',message]);queueMicrotask(()=>receive.forEach(fn=>fn({id:message.id,ok:true,data:message.action==='hello'?{overlay:true}:{}})));},disconnect:()=>disconnect.forEach(fn=>fn())};
+    f.api.permissions={contains:async()=>true};f.api.runtime.connectNative=()=>port;
+  }
+  const options={enabled:true,position:'bottom',height:64,opacity:.9,clickThrough:true,reserve:true,eventIds:[]};
+  it('reserves and then restores monitor space without recreating or navigating stream windows',async()=>{
+    const f=fixture();helper(f);await f.controller.request({type:'LAYOUT',layout:'four-main'});for(const id of [1,2,3,4])await f.add(id);const before=await f.controller.request({type:'GET'});f.calls.length=0;
+    const shown=await f.controller.request({type:'SCORE_OVERLAY',enabled:true,settings:options,events:[],freshness:'test'});expect(shown.runtime.scoreOverlay?.active).toBe(true);expect(f.windows.get(shown.runtime.bindings[shown.deck.games[0].key].windowId).height).toBe(976);
+    const hidden=await f.controller.request({type:'SCORE_OVERLAY',enabled:false});expect(hidden.runtime.scoreOverlay?.active).toBe(false);expect(f.windows.get(hidden.runtime.bindings[hidden.deck.games[0].key].windowId).height).toBe(1040);expect(Object.values(hidden.runtime.bindings).map(b=>b.windowId)).toEqual(Object.values(before.runtime.bindings).map(b=>b.windowId));expect(f.calls.some(c=>c[0]==='windows.create')).toBe(false);expect(f.calls.filter(c=>c[0]==='tabs.update').some(c=>'url'in c[2])).toBe(false);
+  });
+  it('floating mode retains the original layout geometry after safe pairing',async()=>{
+    const f=fixture();helper(f);const before=await f.add(1);const id=before.runtime.bindings[before.deck.games[0].key].windowId;const original={...f.windows.get(id)};await f.controller.request({type:'SCORE_OVERLAY',enabled:true,settings:{...options,reserve:false},events:[]});expect(f.windows.get(id)).toEqual(original);await f.controller.request({type:'SCORE_OVERLAY',enabled:false});
+  });
+});

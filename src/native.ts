@@ -5,18 +5,20 @@ export const NATIVE_HOST='com.gamedeck.windows';
 // through title/process validation followed by an observed geometry challenge.
 export function createNativeManager(api:typeof chrome,onDisconnected:(reason:string)=>void) {
   let port:chrome.runtime.Port|undefined,serial=0;
+  let overlayVisible=false,supportsOverlay=false;
   const paired=new Map<string,number>();
   const pending=new Map<number,{resolve:(value:any)=>void;reject:(error:Error)=>void;timer:ReturnType<typeof setTimeout>}>();
-  async function connect(){
-    if(port)return;
+  async function connect(requireOverlay=false){
+    if(port){if(requireOverlay&&!supportsOverlay)throw new Error('Update the native helper to v2.4 using native/install.ps1 to use the score ticker.');return;}
     if(!await api.permissions.contains({permissions:['nativeMessaging']}))throw new Error('Allow the optional nativeMessaging permission, then install the helper using native/install.ps1.');
     port=api.runtime.connectNative(NATIVE_HOST);
     port.onMessage.addListener(message=>{const entry=pending.get(message.id);if(!entry)return;clearTimeout(entry.timer);pending.delete(message.id);if(message.ok)entry.resolve(message.data);else entry.reject(new Error(message.error||'Native window operation failed.'));});
     port.onDisconnect.addListener(()=>{
       const reason=api.runtime.lastError?.message||'Native helper disconnected; its saved window styles and geometry are restored on disconnect.';
-      for(const entry of pending.values()){clearTimeout(entry.timer);entry.reject(new Error(reason));}pending.clear();paired.clear();port=undefined;onDisconnected(reason);
+      for(const entry of pending.values()){clearTimeout(entry.timer);entry.reject(new Error(reason));}pending.clear();paired.clear();overlayVisible=false;port=undefined;onDisconnected(reason);
     });
-    await request('hello',{});
+    const capabilities=await request('hello',{});supportsOverlay=!!capabilities?.overlay;
+    if(requireOverlay&&!supportsOverlay)throw new Error('Update the native helper to v2.4 using native/install.ps1 to use the score ticker.');
   }
   function request(action:string,data:Record<string,unknown>):Promise<any>{
     if(!port)return Promise.reject(new Error('Native helper is not connected. Install native/install.ps1 for your extension ID.'));
@@ -28,7 +30,7 @@ export function createNativeManager(api:typeof chrome,onDisconnected:(reason:str
     });
   }
   const rect=(win:chrome.windows.Window):Rect=>({left:win.left!,top:win.top!,width:win.width!,height:win.height!});
-  async function place(key:string,tabId:number,windowId:number,monitor:Rect,target:Rect){
+  async function ensurePair(key:string,tabId:number,windowId:number,monitor:Rect){
     if(paired.get(key)!==windowId){
       if(paired.has(key))await release(key);
       const win=await api.windows.get(windowId,{populate:true});
@@ -45,9 +47,14 @@ export function createNativeManager(api:typeof chrome,onDisconnected:(reason:str
       }finally{await api.windows.update(windowId,original);}
       paired.set(key,windowId);
     }
+  }
+  async function place(key:string,tabId:number,windowId:number,monitor:Rect,target:Rect){
+    await ensurePair(key,tabId,windowId,monitor);
     return request('place',{key,rect:target,monitor});
   }
   async function release(key:string){if(!paired.has(key))return;await request('restore',{key});paired.delete(key);}
-  async function stop(){try{if(port)await request('restoreAll',{});}finally{paired.clear();port?.disconnect();port=undefined;}}
-  return {connect,place,release,stop};
+  async function restoreWindows(){if(port)await request('restoreAll',{});paired.clear();if(!overlayVisible){port?.disconnect();port=undefined;}}
+  async function overlay(payload:Record<string,unknown>){if(!port&&!payload.enabled)return;await connect(!!payload.enabled);const result=await request('overlay',payload);overlayVisible=!!payload.enabled;return result;}
+  async function stop(){try{if(port)await request('restoreAll',{});}finally{paired.clear();overlayVisible=false;port?.disconnect();port=undefined;}}
+  return {connect,place,release,ensurePair,overlay,restoreWindows,stop};
 }

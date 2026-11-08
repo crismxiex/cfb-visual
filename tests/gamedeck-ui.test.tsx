@@ -4,6 +4,8 @@ import {beforeEach,afterEach,it,expect,vi} from 'vitest';
 import {createRoot as actualCreateRoot} from 'react-dom/client';
 import {emptyDeck,emptyRuntime} from '../src/model';
 import {useDeck} from '../src/store';
+import {useSports} from '../src/sports/store';
+import {defaults,emptyCache} from '../src/sports/types';
 
 vi.mock('react-dom/client',async importOriginal=>{
   const actual=await importOriginal<typeof import('react-dom/client')>();
@@ -17,6 +19,7 @@ beforeEach(async()=>{
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;
   const {createRoot}=await vi.importActual<typeof import('react-dom/client')>('react-dom/client');
   container=document.createElement('div');document.body.append(container);root=createRoot(container);send.mockClear();
+  useSports.setState({view:null,busy:false,error:''});
   const games=[1,2,3,4].map((id,slot)=>({key:`g${id}`,title:`Game ${id}`,slot,url:`https://example.com/${id}`}));
   useDeck.setState({view:{deck:{...emptyDeck(),layout:'four-main',games},runtime:{...emptyRuntime(),audio:{mode:'solo',key:'g1'},bindings:Object.fromEntries(games.map((g,i)=>[g.key,{tabId:i+1,windowId:10+i,originalWindowId:1,originalIndex:i,originalBounds:{left:0,top:0,width:800,height:600},originalPinned:false,originalDiscardable:true,managed:true}]))},tabs:games.map((_g,i)=>({id:i+1,windowId:10+i,index:0,active:true,pinned:false,highlighted:false,incognito:false,selected:false,discarded:false,autoDiscardable:false,mutedInfo:{muted:i!==0}})),windows:[],displays:[]},busy:false,error:'',connected:false,send,refresh:async()=>{}});
   await act(async()=>root.render(<App/>));
@@ -67,4 +70,23 @@ it('denied player-view permission leaves the playing tabs untouched',async()=>{
 });
 it('Restore page controls needs no new permission request',async()=>{
   const request=await connectPlayers();const button=[...container.querySelectorAll('button')].find(b=>b.textContent==='Restore page controls')!;await act(async()=>button.click());expect(request).not.toHaveBeenCalled();expect(send).toHaveBeenCalledWith({type:'PLAYER_VIEW',enabled:false,fit:'contain'});
+});
+async function scores(linked=true){
+  const settings=defaults();settings.enabled=true;if(linked)settings.links.g3={provider:'espn',eventId:'99',confirmedAt:1};
+  const cache=emptyCache();cache.date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());cache.updatedAt=Date.now();cache.events=[{id:'99',provider:'espn',name:'BYU Cougars at Utah Utes',date:new Date().toISOString(),home:{id:'254',name:'Utah Utes',shortName:'Utah',abbreviation:'UTAH',score:14},away:{id:'252',name:'BYU Cougars',shortName:'BYU',abbreviation:'BYU',score:7},status:'live',statusText:'Q3 · 8:00',quarter:3,clock:'8:00',networks:[]}];
+  const command=vi.fn(async()=>({settings,cache,access:true}));
+  await act(async()=>useSports.setState({view:{settings,cache,access:true},command}));
+  await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='CFB Live')!.click());return command;
+}
+it('only Disney+ and DAZN appear as default streaming-service destinations',()=>{
+  const services=container.querySelector('[aria-label="Streaming Services"]')!;expect(services.textContent).toContain('Disney+ Mexico');expect(services.textContent).toContain('DAZN Mexico');expect(services.textContent).not.toContain('ESPN');
+});
+it('a linked scoreboard card reuses the existing audio selection command',async()=>{
+  await scores();await act(async()=>container.querySelector<HTMLElement>('.score-card')!.click());expect(send).toHaveBeenCalledExactlyOnceWith({type:'SELECT',key:'g3'});
+});
+it('scoreboard Make Main promotes through the existing controller with audio selection',async()=>{
+  await scores();await act(async()=>[...container.querySelectorAll('.score-card-actions button')].find(b=>b.textContent==='Make Main')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(send).toHaveBeenCalledExactlyOnceWith({type:'PROMOTE',key:'g3',forceAudio:true});
+});
+it('an unlinked card opens manual linking instead of guessing an audio target',async()=>{
+  const command=await scores(false);await act(async()=>container.querySelector<HTMLElement>('.score-card')!.click());expect(send).not.toHaveBeenCalled();expect(container.querySelector('[aria-label="Link scoreboard event to window"]')).not.toBeNull();await act(async()=>container.querySelector<HTMLElement>('.link-window-option')!.click());expect(command).toHaveBeenCalledWith({type:'SPORTS_LINK',key:'g1',eventId:'99'});
 });

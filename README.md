@@ -2,6 +2,8 @@
 
 GameDeck arranges your existing, signed-in Chrome sports tabs as real independent popup windows. The React dashboard is a layout map and control panel. Your original streaming pages continue running in the same Chrome profile; no video is captured, embedded, mirrored, proxied, or retransmitted.
 
+**New in v2.4 — Sports Hub:** Disney+ and DAZN Mexico launchers; real FBS score cards/ticker, favorites, confirmed event-to-window linking, score-card audio/main controls, in-tile scores and an optional native desktop ticker. See [Sports Hub setup, provider research, architecture and verification](docs/SPORTS-HUB.md). The completed provider was checked against the live feed; the optional native overlay was compiled but Windows denied executing its rebuilt helper. Open **CFB Live → Enable CFB scores** after reloading the extension. Chrome 120+ is required.
+
 ## Windows 11 setup
 
 The production extension is already built in **dist/**. Normal layout and audio features require no server or native executable. The optional immersive helper is separate.
@@ -129,7 +131,7 @@ Commands run sequentially to prevent competing geometry updates. Each successful
 
 ## API and platform limitations
 
-- Permissions are only `tabs`, `storage`, and `system.display`. The `windows` namespace needs no separate permission. There are no required host permissions, persistent content scripts, capture APIs, cookie access, video processing or iframe players. Optional scripting and limited provider-origin access are requested only for Clean player view. The optional nativeMessaging permission is requested only for immersive mode.
+- Required permissions are `tabs`, `storage`, `system.display`, and `alarms`. The `windows` namespace needs no separate permission. There are no required host permissions, persistent content scripts, capture APIs, cookie access, video processing or iframe players. Optional scripting and limited provider-origin access are requested only for Clean player view. The optional nativeMessaging permission is requested only for immersive mode.
 - `windows.create({tabId,type:'popup'})` adopts an existing tab. `tabs.move` works only between normal windows, so returning a popup uses a temporary normal-window bridge when needed. If the original normal window closed, restoration creates a replacement and regroups restoration targets. Original tab groups and full window/tab-strip configuration are not reconstructed.
 - Display work areas exclude OS-reserved space. Coordinates are passed through in Chrome's units without multiplying by devicePixelRatio. Mixed display scaling, window borders, OS rounding and Chrome minimum dimensions may alter requested bounds. Returned bounds are checked and visible warnings explain adjustments.
 - Every slot includes the browser frame and the provider's own page UI. An extension cannot remove Windows chrome, embed arbitrary native windows, or make multiple windows exclusive fullscreen simultaneously.

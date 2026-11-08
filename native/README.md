@@ -1,6 +1,8 @@
 # Optional GameDeck Windows helper
 
-The normal extension works without this helper. Chrome's window API places framed popup windows; it cannot strip native styles. The helper attempts native caption/resize-frame reduction with Win32 `SetWindowLongPtr` and `SetWindowPos`. **Chrome can still draw its own title bar. This is experimental frame reduction, not a promise of fully borderless Chrome or uninterrupted provider playback.** It does not touch video, page DOM, credentials, audio, DRM, browser profiles, or the Windows taskbar.
+The normal extension works without this helper. Chrome's window API places framed popup windows; it cannot strip native styles. The helper attempts native caption/resize-frame reduction with Win32 `SetWindowLongPtr` and `SetWindowPos`. Version 2.4 also includes a separate native text-score ticker in `ScoreOverlay.cs`, with top/bottom placement, opacity and click-through support. **Chrome can still draw its own title bar. This is experimental frame reduction, not a promise of fully borderless Chrome or uninterrupted provider playback.** It does not touch video, page DOM, credentials, audio, DRM, browser profiles, or the Windows taskbar.
+
+For score-ticker use, rebuild/re-register this version and see [Sports Hub overlay instructions](../docs/SPORTS-HUB.md#optional-native-score-ticker). The ticker receives normalized score text from the extension; it makes no network requests and draws only in its own topmost window. Normal helper exit closes that window. The v2.4 source compiles, but Windows denied executing the rebuilt helper in this run, so native self-test/rendering and click-through behavior were not verified.
 
 ## Build and install explicitly
 
@@ -48,6 +50,6 @@ Forced process termination or a machine crash can prevent cleanup. A recovery jo
 
 Recovery skips journals belonging to a still-running helper and revalidates HWND, Chrome class, process ID, process creation time and the unique native window property before restoring. Closed/recycled/unrelated windows are skipped. Recovery records contain native geometry, styles, handles and process identities; no URLs, titles, cookies, credentials or video are stored in them.
 
-The helper is a locally built development executable, not a signed distributed installer. Compilation and pure protocol/geometry tests have passed. Live Chrome style changes and recovery need separate verification on your displays; the helper has not been registered or activated automatically.
+The helper is a locally built development executable, not a signed distributed installer. Earlier geometry/protocol self-tests passed before the v2.4 overlay update. The v2.4 source compiles, but Windows denied running the rebuilt executable, including its self-test. Live Chrome style changes, ticker rendering and recovery need separate verification on your displays; this update did not register or activate the helper automatically.
 
 References: [Chrome Native Messaging](https://developer.chrome.com/docs/extensions/develop/concepts/native-messaging), [SetWindowPos](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setwindowpos), [GetWindowRect and DPI virtualization](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowrect).

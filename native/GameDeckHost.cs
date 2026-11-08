@@ -84,9 +84,22 @@ class GameDeckHost {
     static void RestoreAll(){var errors=new List<string>();foreach(string key in Leases.Keys.ToArray())try{Restore(key);}catch(Exception e){errors.Add(e.Message);}if(errors.Count>0)throw new Exception("Restore incomplete; run GameDeckHost.exe --restore after closing this helper. "+String.Join("; ",errors));}
     static object Handle(Dictionary<string,object> message){
         string action=Text(message,"action"),key=Text(message,"key");
-        if(action=="hello")return new {version="2.2.0",capability="validated-native-frame-reduction"};
+        if(action=="hello")return new {version="2.4.0",capability="validated-native-frame-reduction",overlay=true};
         if(action=="restoreAll"){RestoreAll();return new {restored=true};}
         if(action=="restore"){Restore(key);return new {restored=true};}
+        if(action=="overlay"){
+            if(!message.ContainsKey("enabled")||!Convert.ToBoolean(message["enabled"])){ScoreOverlay.Hide();return new {visible=false};}
+            Lease anchor;string anchorKey=Text(message,"anchorKey");
+            if(!Leases.TryGetValue(anchorKey,out anchor)||!anchor.Paired||!Identity(anchor,true))throw new Exception("Pair a managed game on the viewing monitor before opening a native overlay.");
+            var options=Obj(message["settings"]);Rect area=Map(Obj(message["area"]),Obj(message["monitor"]),anchor.NativeMonitor);
+            int logicalHeight=Num(options,"height");if(logicalHeight<40||logicalHeight>160)throw new Exception("Ticker height must be 40–160.");
+            double scale=(double)anchor.NativeMonitor.Height/Num(Obj(message["monitor"]),"height");int height=(int)Math.Round(logicalHeight*scale);
+            if(area.Left<anchor.NativeMonitor.Left||area.Top<anchor.NativeMonitor.Top||area.Right>anchor.NativeMonitor.Right||area.Bottom>anchor.NativeMonitor.Bottom||height>=area.Height)throw new Exception("Invalid ticker monitor bounds.");
+            var lines=((object[])message["lines"]).Select(v=>Convert.ToString(v)).Take(30).Select(v=>v.Length>350?v.Substring(0,350):v).ToArray();
+            int top=Text(options,"position")=="top"?area.Top:area.Bottom-height;
+            ScoreOverlay.Update(new System.Drawing.Rectangle(area.Left,top,area.Width,height),Convert.ToDouble(options["opacity"]),Convert.ToBoolean(options["clickThrough"]),lines,Text(message,"freshness"));
+            return new {visible=true};
+        }
         if(key.Length<1||key.Length>100)throw new Exception("Invalid game key.");
         if(action=="prepare"){
             if(Leases.ContainsKey(key))throw new Exception("Window is already paired.");
@@ -155,6 +168,6 @@ class GameDeckHost {
             while((payload=ReadFrame(input))!=null){int id=0;try{var message=Obj(Json.DeserializeObject(Encoding.UTF8.GetString(payload)));id=Convert.ToInt32(message["id"]);var data=Handle(message);WriteFrame(output,new {id=id,ok=true,data=data});}catch(Exception e){WriteFrame(output,new {id=id,ok=false,error=e.Message});}}
             return 0;
         }catch(Exception e){Console.Error.WriteLine(e.Message);return 1;}
-        finally{try{if(Journal!=null)RestoreAll();}catch(Exception e){Console.Error.WriteLine(e.Message);}}
+        finally{try{ScoreOverlay.Hide();if(Journal!=null)RestoreAll();}catch(Exception e){Console.Error.WriteLine(e.Message);}}
     }
 }
