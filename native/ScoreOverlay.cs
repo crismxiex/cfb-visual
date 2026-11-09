@@ -26,7 +26,7 @@ static class ScoreOverlay {
     class TickerForm:Form {
         string[] Lines=new string[0];string Freshness="";bool Through;int Offset;
         readonly System.Windows.Forms.Timer Paging=new System.Windows.Forms.Timer{Interval=8000};
-        public TickerForm(){FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;Opacity=0;BackColor=Color.FromArgb(12,19,30);DoubleBuffered=true;Text="GameDeck CFB score ticker";StartPosition=FormStartPosition.Manual;Paging.Tick+=(s,e)=>{if(Lines.Length>VisibleCount){Offset=(Offset+VisibleCount)%Lines.Length;Invalidate();}};Paging.Start();}
+        public TickerForm(){FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;Opacity=0;BackColor=Color.FromArgb(12,19,30);DoubleBuffered=true;Text="GameDeck score ticker";StartPosition=FormStartPosition.Manual;Paging.Tick+=(s,e)=>{if(Lines.Length>VisibleCount){Offset=(Offset+VisibleCount)%Lines.Length;Invalidate();}};Paging.Start();}
         protected override bool ShowWithoutActivation{get{return true;}}
         protected override CreateParams CreateParams{get{var cp=base.CreateParams;cp.ExStyle|=0x08000000|0x00000080;if(Through)cp.ExStyle|=0x00000020;return cp;}}
         protected override void WndProc(ref Message message){if(Through&&message.Msg==0x0084){message.Result=new IntPtr(-1);return;}base.WndProc(ref message);}
@@ -46,7 +46,7 @@ static class ScoreOverlay {
             using(var muted=new SolidBrush(Color.FromArgb(112,142,182)))
             using(var text=new SolidBrush(Color.FromArgb(226,235,249)))
             using(var divider=new Pen(Color.FromArgb(43,61,86))){
-                g.DrawString("GAMEDECK · CFB",font,title,12,Height*.21f);g.DrawString("Score data · "+Freshness,small,muted,new RectangleF(12,Height*.55f,BrandWidth-20,Height*.4f));
+                g.DrawString("GAMEDECK",font,title,12,Height*.21f);g.DrawString(Freshness,small,muted,new RectangleF(12,Height*.55f,BrandWidth-20,Height*.4f));
                 if(Lines.Length==0){g.DrawString("No selected scores available",font,muted,BrandWidth+15,Height*.35f);return;}
                 for(int i=0;i<Math.Min(VisibleCount,Lines.Length);i++){
                     int x=BrandWidth+i*CellWidth;g.DrawLine(divider,x,10,x,Height-10);string[] parts=Lines[(Offset+i)%Lines.Length].Split('\n');

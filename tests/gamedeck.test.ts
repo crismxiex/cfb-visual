@@ -37,6 +37,7 @@ describe('Command Center player volume',()=>{
     const states=new Map([[1,{available:true,volume:.25,muted:true,status:''}],[2,{available:true,volume:.8,muted:false,status:''}]]);
     f.api.permissions={contains:async()=>granted};
     f.api.scripting={executeScript:async(p:any)=>{
+      if(p.args.includes(undefined))throw new TypeError('Value is unserializable');
       f.calls.push(['player',p.target.tabId,...p.args]);const state=states.get(p.target.tabId)!;
       const [action,volume]=p.args;
       if(action==='listen'){state.volume=volume>0?volume:state.volume||.5;state.muted=false;}
@@ -46,6 +47,18 @@ describe('Command Center player volume',()=>{
     for(const id of [1,2])f.tabs.get(id).url='https://www.dazn.com/watch/'+id;
     return states;
   }
+  it('reads Disney+ player volume without an undefined script argument',async()=>{
+    const f=fixture();
+    const media=players(f);
+    f.tabs.get(1).url='https://www.disneyplus.com/watch/game';
+    const added=await f.add(1);
+    const key=added.deck.games[0].key;
+    media.get(1)!.muted=true;
+    const result=await f.controller.request({type:'AUDIO_STATUS'});
+    expect(result.runtime.bindings[key].playerAudio).toMatchObject({available:true,volume:.25,muted:true});
+    expect(f.calls).toContainEqual(['player',1,'read']);
+    expect(media.get(1)?.muted).toBe(true);
+  });
   it('unmutes the chosen player before its tab, after muting other games, without moving windows',async()=>{
     const f=fixture();const media=players(f);await f.add(1);const v=await f.add(2);media.get(2)!.muted=true;f.calls.length=0;
     const r=await f.controller.request({type:'SELECT',key:v.deck.games[1].key});

@@ -15,7 +15,14 @@ export function createAudioController(api: typeof chrome, getDeck:()=>Deck, getR
       if(!api.permissions||!api.scripting||!await api.permissions.contains({permissions:['scripting'],origins:[origin]})){
         binding.playerAudio={available:false,status:'Enable volume controls to adjust and unmute the player.'};return false;
       }
-      const results=await api.scripting.executeScript({target:{tabId:binding.tabId,frameIds:[0]},world:'ISOLATED',func:controlPlayerAudio,args:[action,volume]});
+      // Chrome requires every script argument to be JSON-serializable.
+      const args:Parameters<typeof controlPlayerAudio>=volume===undefined?[action]:[action,volume];
+      const results=await api.scripting.executeScript({
+        target:{tabId:binding.tabId,frameIds:[0]},
+        world:'ISOLATED',
+        func:controlPlayerAudio,
+        args,
+      });
       binding.playerAudio=results[0]?.result||{available:false,status:'Player audio is unavailable. Refresh audio to try again.'};
       return binding.playerAudio.available;
     } catch(error) {binding.playerAudio={available:false,status:error instanceof Error?error.message:String(error)};return false;}

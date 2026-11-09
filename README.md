@@ -2,11 +2,13 @@
 
 GameDeck arranges your existing, signed-in Chrome sports tabs as real independent popup windows. The React dashboard is a layout map and control panel. Your original streaming pages continue running in the same Chrome profile; no video is captured, embedded, mirrored, proxied, or retransmitted.
 
-**New in v2.4.2 — Reliability fixes:** cross-monitor saved layouts restore native pairing safely; replacement tabs retain their audio selection; volume sliders stay responsive during updates; tickers exclude scores from a different date. **CFB Live → Desktop score ticker → Open browser ticker** opens a separate Chrome score window without a helper. Native ticker startup now enables score access, reports setup errors and offers **Retry ticker**. Its Windows helper still needs to be installed and permitted to execute.
+**New in v2.5.0.** Open **Sports Hub** and choose **NFL** or **College football** from the league menu. The board and tickers follow the selected league. Each league keeps its own cached scores, favorites, and ticker picks.
+
+**New in v2.4.2 — Reliability fixes:** cross-monitor saved layouts restore native pairing safely; replacement tabs retain their audio selection; volume sliders stay responsive during updates; tickers exclude scores from a different date. **Sports Hub → Desktop score ticker → Open browser ticker** opens a separate Chrome score window without a helper. Native ticker startup now enables score access, reports setup errors and offers **Retry ticker**. Its Windows helper still needs to be installed and permitted to execute.
 
 **New in v2.4.1 — Player volume:** per-game volume sliders and player unmuting from the Command Center. Reload the extension, then click **Enable volume controls** once to grant access for your managed providers. Listen and audio switching recover muted players without opening their windows.
 
-**New in v2.4 — Sports Hub:** Disney+ and DAZN Mexico launchers; real FBS score cards/ticker, favorites, confirmed event-to-window linking, score-card audio/main controls, in-tile scores and an optional native desktop ticker. See [Sports Hub setup, provider research, architecture and verification](docs/SPORTS-HUB.md). The completed provider was checked against the live feed; the optional native overlay was compiled but Windows denied executing its rebuilt helper. Open **CFB Live → Enable CFB scores** after reloading the extension. Chrome 120+ is required.
+**New in v2.4 — Sports Hub:** Disney+ and DAZN Mexico launchers; real FBS score cards/ticker, favorites, confirmed event-to-window linking, score-card audio/main controls, in-tile scores and an optional native desktop ticker. See [Sports Hub setup, provider research, architecture and verification](docs/SPORTS-HUB.md). The completed provider was checked against the live feed; the optional native overlay was compiled but Windows denied executing its rebuilt helper. Open **Sports Hub → Enable scores** after reloading the extension. Chrome 120+ is required.
 
 ## Windows 11 setup
 

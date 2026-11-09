@@ -2,8 +2,8 @@ import {useEffect,useState} from 'react';
 import {ArrowUpRight,Bell,BellOff,ChevronDown,Link2,Monitor,Plus,Radio,RefreshCw,Star,Trash2,Volume2,X} from 'lucide-react';
 import {useDeck} from '../store';
 import {useSports} from './store';
-import {CONFERENCES,defaults,emptyCache,live,mexicoDate,scoreText,selectEvents,stale} from './types';
-import type {ScoreEvent,ScoreTeam,SportsSettings,SportsPatch,OverlaySettings} from './types';
+import {CONFERENCES,defaults,emptyCache,leagueId,live,mexicoDate,scoreText,selectEvents,stale,SCORE_CACHE_KEYS,SCORE_LEAGUES} from './types';
+import type {ScoreEvent,ScoreLeague,ScoreTeam,SportsSettings,SportsPatch,OverlaySettings} from './types';
 import {ESPN_ACCESS} from './espn';
 import {DEFAULT_SERVICES} from './services';
 import type {LaunchResult} from './services';
@@ -14,7 +14,7 @@ const time=(value:string|number)=>new Intl.DateTimeFormat('en-US',{timeZone:'Ame
 const status=(e:ScoreEvent)=>e.status==='scheduled'?time(e.date):e.status==='final'?'Final':e.status==='halftime'?'Halftime':e.statusText;
 export function SportsBootstrap(){
   const connected=useDeck(s=>s.connected),get=useSports(s=>s.get);
-  useEffect(()=>{if(!connected||!globalThis.chrome?.runtime?.id)return;void get();const change=(changes:Record<string,unknown>)=>{if(changes.gamedeckSports||changes.gamedeckScores)void get();};chrome.storage.onChanged.addListener(change);return()=>chrome.storage.onChanged.removeListener(change);},[connected,get]);return null;
+  useEffect(()=>{if(!connected||!globalThis.chrome?.runtime?.id)return;void get();const change=(changes:Record<string,unknown>)=>{if(changes.gamedeckSports||Object.values(SCORE_CACHE_KEYS).some(key=>changes[key]))void get();};chrome.storage.onChanged.addListener(change);return()=>chrome.storage.onChanged.removeListener(change);},[connected,get]);return null;
 }
 export function StreamingServices(){
   const {view,command,busy}=useSports();const {connected,send}=useDeck();
@@ -24,12 +24,20 @@ export function StreamingServices(){
   </section>;
 }
 function TeamRow({team,possesses}:{team:ScoreTeam;possesses:boolean}){
-  const {view,command}=useSports();const favorite=view?.settings.favorites.includes(team.id);
+  const {view,command}=useSports();
+  const favorite=view?.settings.favorites.includes(leagueId(view.settings.league,team.id));
   return <div className="score-team">{team.logo?<img src={team.logo} alt="" referrerPolicy="no-referrer" onError={e=>{e.currentTarget.style.display='none';}}/>:<span className="team-logo-fallback">{team.abbreviation.slice(0,2)}</span>}<div className="score-team-name">{team.rank!==undefined&&<span className="team-rank" title={`${team.rankPoll||'Poll unspecified'}${team.rankDate?' · '+time(team.rankDate):''}`}>#{team.rank}</span>}<strong>{team.shortName}</strong>{possesses&&<span className="possession" title="Possession reported by ESPN">●</span>}<small>{team.record||team.abbreviation}{team.conferenceId&&CONFERENCES[team.conferenceId]?' · '+CONFERENCES[team.conferenceId]:''}</small></div><button className={`icon-button favorite ${favorite?'is-favorite':''}`} aria-label={`${favorite?'Unfavorite':'Favorite'} ${team.name}`} onClick={e=>{e.stopPropagation();void command({type:'SPORTS_FAVORITE',teamId:team.id});}}><Star size={13} fill={favorite?'currentColor':'none'}/></button><span className="team-score">{scoreText(team)}</span></div>;
 }
 export function Scoreboard({compact=false}:{compact?:boolean}){
   const sports=useSports(),deck=useDeck(),settings=sports.view?.settings||defaults(),cache=sports.view?.cache||emptyCache();
   const [linkEvent,setLinkEvent]=useState<ScoreEvent|null>(null),[expanded,setExpanded]=useState<string|null>(null),[,tick]=useState(0);
+  const league=SCORE_LEAGUES[settings.league];
+  const college=settings.league==='cfb';
+  const filters=college
+    ? [['all','All FBS'],['live','Live'],['ranked','Top 25'],['5','Big Ten'],['8','SEC'],['4','Big 12'],['1','ACC'],['favorites','Favorites']]
+    : [['all','All NFL'],['live','Live'],['favorites','Favorites']];
+  const activeFilter=!college&&(settings.filter==='ranked'||CONFERENCES[settings.filter])?'all':settings.filter;
+  useEffect(()=>{setLinkEvent(null);setExpanded(null);},[settings.league]);
   useEffect(()=>{const timer=setInterval(()=>tick(n=>n+1),5000);return()=>clearInterval(timer);},[]);
   const selected=settings.date||mexicoDate();
   const events=cache.date===selected?selectEvents(cache.events,settings):[];
@@ -39,23 +47,68 @@ export function Scoreboard({compact=false}:{compact?:boolean}){
   const patch=(patch:SportsPatch)=>void sports.command({type:'SPORTS_SETTINGS',patch});
   async function enable(){if(!globalThis.chrome?.runtime?.id)return;const allowed=await chrome.permissions.request({origins:[sports.view?.accessOrigin||ESPN_ACCESS]});if(allowed)await sports.command({type:'SPORTS_SETTINGS',patch:{enabled:true}});}
   if(compact&&!settings.enabled&&new URLSearchParams(location.search).get('view')!=='ticker')return null;
-  return <section className={`cfb-panel ${compact?'cfb-workspace':'panel'}`} aria-label="CFB Live">
-    <div className="cfb-heading"><div><span className="section-kicker">COLLEGE FOOTBALL · FBS</span><h2><Radio size={17}/>CFB Live {events.some(live)&&<span className="badge live-badge">LIVE</span>}</h2></div><div className="cfb-heading-actions"><span className={`freshness ${isStale?'stale':''}`}>{cache.updatedAt?`${isStale?'Cached · ':''}Updated ${time(cache.updatedAt)} MX`:'No successful update yet'}</span><button className="icon-button" title="Refresh scores now" aria-label="Refresh scores" disabled={sports.busy||!settings.enabled} onClick={()=>void sports.command({type:'SPORTS_REFRESH'})}><RefreshCw size={15} className={sports.busy?'spin':''}/></button></div></div>
-    {!settings.enabled||!sports.view?.access?<div className="cfb-enable"><p>Real FBS scores from ESPN’s unofficial public data feed. Score access is optional and independent of your streaming sessions.</p><button className="button primary" disabled={!deck.connected} onClick={()=>void enable()}>Enable CFB scores</button></div>:<>
-      {!compact&&<><div className="cfb-filters">{[['all','All FBS'],['live','Live'],['ranked','Top 25'],['5','Big Ten'],['8','SEC'],['4','Big 12'],['1','ACC'],['favorites','Favorites']].map(([value,label])=><button key={value} className={settings.filter===value?'filter-chip chosen':'filter-chip'} onClick={()=>patch({filter:value})}>{label}</button>)}</div><div className="cfb-options"><input type="search" aria-label="Search CFB teams" placeholder="Find a team…" value={settings.query} onChange={e=>patch({query:e.target.value})}/><select aria-label="Conference filter" value={CONFERENCES[settings.filter]?settings.filter:'all'} onChange={e=>patch({filter:e.target.value})}><option value="all">All conferences</option>{Object.entries(CONFERENCES).map(([id,name])=><option key={id} value={id}>{name}</option>)}</select><label className="ranked-filter"><input type="checkbox" checked={settings.rankedOnly||settings.filter==='ranked'} onChange={e=>patch({rankedOnly:e.target.checked,...(!e.target.checked&&settings.filter==='ranked'?{filter:'all'}:{})})}/>Ranked games</label><select aria-label="Game status filter" value={settings.status} onChange={e=>patch({status:e.target.value})}><option value="all">All statuses</option><option value="live">In progress</option><option value="scheduled">Scheduled</option><option value="final">Final</option></select><input type="date" aria-label="Scoreboard date in Mexico" value={selected} onChange={e=>patch({date:e.target.value})}/><button className="button secondary small" onClick={()=>patch({date:''})}>Today</button><button className={`button secondary small ${settings.favorites.includes('2483')?'is-favorite':''}`} onClick={()=>void sports.command({type:'SPORTS_FAVORITE',teamId:'2483'})}><Star size={13}/>Oregon</button><select aria-label="Scoreboard presentation" value={settings.mode} onChange={e=>patch({mode:e.target.value as SportsSettings['mode']})}><option value="expanded">Game cards</option><option value="compact">Compact ticker</option></select></div></>}
+  return <section className={`cfb-panel ${compact?'cfb-workspace':'panel'}`} aria-label={league.title}>
+    <div className="cfb-heading">
+      <div>
+        <span className="section-kicker">{league.label}</span>
+        <h2><Radio size={17}/>{league.title} {events.some(live)&&<span className="badge live-badge">LIVE</span>}</h2>
+      </div>
+      <div className="cfb-heading-actions">
+        <select aria-label="Score league" value={settings.league} disabled={!deck.connected||sports.busy} onChange={e=>patch({league:e.target.value as ScoreLeague})}>
+          <option value="cfb">College football</option>
+          <option value="nfl">NFL</option>
+        </select>
+        <span className={isStale?'freshness stale':'freshness'}>{cache.updatedAt?`${isStale?'Cached · ':''}Updated ${time(cache.updatedAt)} MX`:'No successful update yet'}</span>
+        <button className="icon-button" title="Refresh scores now" aria-label="Refresh scores" disabled={sports.busy||!settings.enabled} onClick={()=>void sports.command({type:'SPORTS_REFRESH'})}>
+          <RefreshCw size={15} className={sports.busy?'spin':''}/>
+        </button>
+      </div>
+    </div>
+    {!settings.enabled||!sports.view?.access?<div className="cfb-enable"><p>Football scores from ESPN’s unofficial public data feed. Score access is optional and independent of your streaming sessions.</p><button className="button primary" disabled={!deck.connected} onClick={()=>void enable()}>Enable scores</button></div>:<>
+      {!compact&&<>
+        <div className="cfb-filters">{filters.map(([value,label])=>
+          <button key={value} className={activeFilter===value?'filter-chip chosen':'filter-chip'} onClick={()=>patch({filter:value})}>{label}</button>
+        )}</div>
+        <div className="cfb-options">
+          <input type="search" aria-label="Search teams" placeholder="Find a team…" value={settings.query} onChange={e=>patch({query:e.target.value})}/>
+          {college&&<>
+            <select aria-label="Conference filter" value={CONFERENCES[settings.filter]?settings.filter:'all'} onChange={e=>patch({filter:e.target.value})}>
+              <option value="all">All conferences</option>
+              {Object.entries(CONFERENCES).map(([id,name])=><option key={id} value={id}>{name}</option>)}
+            </select>
+            <label className="ranked-filter">
+              <input type="checkbox" checked={settings.rankedOnly||settings.filter==='ranked'} onChange={e=>patch({rankedOnly:e.target.checked,...(!e.target.checked&&settings.filter==='ranked'?{filter:'all'}:{})})}/>
+              Ranked games
+            </label>
+          </>}
+          <select aria-label="Game status filter" value={settings.status} onChange={e=>patch({status:e.target.value})}>
+            <option value="all">All statuses</option>
+            <option value="live">In progress</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="final">Final</option>
+          </select>
+          <input type="date" aria-label="Scoreboard date in Mexico" value={selected} onChange={e=>patch({date:e.target.value})}/>
+          <button className="button secondary small" onClick={()=>patch({date:''})}>Today</button>
+          {college&&<button className={settings.favorites.includes('2483')?'button secondary small is-favorite':'button secondary small'} onClick={()=>void sports.command({type:'SPORTS_FAVORITE',teamId:'2483'})}><Star size={13}/>Oregon</button>}
+          <select aria-label="Scoreboard presentation" value={settings.mode} onChange={e=>patch({mode:e.target.value as SportsSettings['mode']})}>
+            <option value="expanded">Game cards</option>
+            <option value="compact">Compact ticker</option>
+          </select>
+        </div>
+      </>}
       {(sports.error||cache.error||cache.coverageWarning)&&<div role="status" className="score-notice">{sports.error||cache.error||cache.coverageWarning}{cache.updatedAt?' Last successful scores are retained.':''}</div>}
       {isStale&&!cache.error&&<p className="score-notice">Scores may be stale. Game clocks are shown as last reported, not simulated.</p>}
-      {events.length?(compact||settings.mode==='compact'?<div className="score-ticker">{events.map(event=><button key={event.id} className={`ticker-game ${linked(event)?'linked':''}`} onClick={()=>activate(event)}><span>{event.away.abbreviation} <strong>{scoreText(event.away)}</strong> <span className="muted">—</span> {event.home.abbreviation} <strong>{scoreText(event.home)}</strong></span><small>{status(event)} {linked(event)===deck.view?.runtime.audio.key?<Volume2 size={10}/>:linked(event)?<Link2 size={10}/>:null}</small></button>)}</div>:<div className="score-grid">{events.map(event=>{const key=linked(event),isAudio=key&&deck.view?.runtime.audio.key===key;return <article role="button" tabIndex={0} aria-label={`${event.away.name} at ${event.home.name}${key?', listen to linked stream':', link a window'}`} key={event.id} className={`score-card ${isAudio?'audio-active':''}`} onClick={()=>activate(event)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==='Enter'||e.key===' ')){e.preventDefault();activate(event);}}}>
+      {events.length?(compact||settings.mode==='compact'?<div className="score-ticker">{events.map(event=><button key={event.id} className={`ticker-game ${linked(event)?'linked':''}`} onClick={()=>activate(event)}><span>{event.away.abbreviation} <strong>{scoreText(event.away)}</strong> <span className="muted">—</span> {event.home.abbreviation} <strong>{scoreText(event.home)}</strong></span><small>{status(event)} {linked(event)===deck.view?.runtime.audio.key?<Volume2 size={10}/>:linked(event)?<Link2 size={10}/>:null}</small></button>)}</div>:<div className="score-grid">{events.map(event=>{const key=linked(event),isAudio=key&&deck.view?.runtime.audio.key===key;const eventKey=leagueId(settings.league,event.id);return <article role="button" tabIndex={0} aria-label={`${event.away.name} at ${event.home.name}${key?', listen to linked stream':', link a window'}`} key={event.id} className={`score-card ${isAudio?'audio-active':''}`} onClick={()=>activate(event)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==='Enter'||e.key===' ')){e.preventDefault();activate(event);}}}>
         <div className="score-card-top"><span className={live(event)?'game-live':''}>{live(event)&&<span className="status-dot"/>}{status(event)}</span>{isAudio?<Volume2 size={13}/>:key?<Link2 size={13}/>:<Monitor size={13}/>}</div><TeamRow team={event.away} possesses={live(event)&&event.possession===event.away.id}/><TeamRow team={event.home} possesses={live(event)&&event.possession===event.home.id}/><div className="score-card-bottom"><span title="Provider-reported network; availability in Mexico may differ.">{event.networks.join(' / ')||'Network not supplied'}</span><button className="icon-button" aria-label={`Details for ${event.name}`} onClick={e=>{e.stopPropagation();setExpanded(expanded===event.id?null:event.id);}}><ChevronDown size={14}/></button></div>
         {expanded===event.id&&<div className="score-details"><p>Kickoff · {time(event.date)} Mexico City</p>{event.venue&&<p>{event.venue}</p>}{event.detail&&<p>{event.detail}</p>}{event.clock&&live(event)&&<p>{event.quarter?`Period ${event.quarter} · `:''}{event.clock} (last reported)</p>}{[event.away,event.home].filter(t=>t.rank).map(t=><p key={t.id}>{t.abbreviation} #{t.rank} · {t.rankPoll}{t.rankDate?' · '+time(t.rankDate):''}</p>)}</div>}
-        <div className="score-card-actions" onClick={e=>e.stopPropagation()}><button className="text-button" onClick={()=>setLinkEvent(event)}><Link2 size={12}/>{key?'Change link':'Link to Window'}</button>{key&&<button className="text-button" disabled={deck.busy||!deck.view?.runtime.bindings[key]} onClick={()=>void deck.send({type:'PROMOTE',key,forceAudio:true})}><Star size={12}/>Make Main</button>}<button className="icon-button" title={settings.mutedEvents.includes(event.id)?'Enable alerts for this game':'Mute alerts for this game'} aria-label={`Toggle alerts for ${event.name}`} onClick={()=>void sports.command({type:'SPORTS_MUTE_EVENT',eventId:event.id})}>{settings.mutedEvents.includes(event.id)?<BellOff size={12}/>:<Bell size={12}/>}</button><label className="overlay-event" title="Include in desktop ticker"><input type="checkbox" aria-label={`Show ${event.name} in overlay`} checked={settings.overlay.eventIds.includes(event.id)} onChange={()=>patch({overlay:{...settings.overlay,eventIds:settings.overlay.eventIds.includes(event.id)?settings.overlay.eventIds.filter(id=>id!==event.id):[...settings.overlay.eventIds,event.id]}})}/>Ticker</label></div>
-      </article>;})}</div>):<p className="score-empty">{cache.error?'Scores are unavailable for this date. Retry manually or wait for the scheduled refresh.':cache.date!==selected?'Fetching this date…':'No games match these filters. Try All FBS or another date.'}</p>}
+        <div className="score-card-actions" onClick={e=>e.stopPropagation()}><button className="text-button" onClick={()=>setLinkEvent(event)}><Link2 size={12}/>{key?'Change link':'Link to Window'}</button>{key&&<button className="text-button" disabled={deck.busy||!deck.view?.runtime.bindings[key]} onClick={()=>void deck.send({type:'PROMOTE',key,forceAudio:true})}><Star size={12}/>Make Main</button>}<button className="icon-button" title={settings.mutedEvents.includes(eventKey)?'Enable alerts for this game':'Mute alerts for this game'} aria-label={`Toggle alerts for ${event.name}`} onClick={()=>void sports.command({type:'SPORTS_MUTE_EVENT',eventId:event.id})}>{settings.mutedEvents.includes(eventKey)?<BellOff size={12}/>:<Bell size={12}/>}</button><label className="overlay-event" title="Include in desktop ticker"><input type="checkbox" aria-label={`Show ${event.name} in overlay`} checked={settings.overlay.eventIds.includes(eventKey)} onChange={()=>patch({overlay:{eventIds:settings.overlay.eventIds.includes(eventKey)?settings.overlay.eventIds.filter(id=>id!==eventKey):[...settings.overlay.eventIds,eventKey]}})}/>Ticker</label></div>
+      </article>;})}</div>):<p className="score-empty">{cache.error?'Scores are unavailable for this date. Retry manually or wait for the scheduled refresh.':cache.date!==selected?'Fetching this date…':'No games match these filters. Try another date or clear your filters.'}</p>}
       {!compact&&<><div className="score-alert-settings"><label><input type="checkbox" checked={settings.alertsEnabled} onChange={e=>patch({alertsEnabled:e.target.checked})}/>Subtle score alerts</label><button className="text-button" onClick={()=>void sports.command({type:'SPORTS_CLEAR_ALERTS'})}>Clear alerts</button></div>{cache.alerts.slice(0,5).map(alert=><div className="score-alert" key={alert.id}><Bell size={12}/>{alert.message}</div>)}<OverlayControls/></>}
     </>}
-    <div className="score-attribution">{cache.attributionUrl?<a href={cache.attributionUrl} target="_blank" rel="noreferrer">Score data: {cache.providerName}</a>:<span>Score data: {cache.providerName}</span>}<span>{cache.rankLabel||'Rankings shown only when supplied'} · Mexico City time</span></div>
+    <div className="score-attribution">{cache.attributionUrl?<a href={cache.attributionUrl} target="_blank" rel="noreferrer">Score data: {cache.providerName}</a>:<span>Score data: {cache.providerName}</span>}<span>{cache.rankLabel&&`${cache.rankLabel} · `}Mexico City time</span></div>
     {linkEvent&&<div className="modal-backdrop" onClick={()=>setLinkEvent(null)}><section className="modal" role="dialog" aria-modal="true" aria-label="Link scoreboard event to window" onClick={e=>e.stopPropagation()}><div className="modal-heading"><h2>Link to Window</h2><button className="icon-button" aria-label="Close link dialog" onClick={()=>setLinkEvent(null)}><X size={18}/></button></div><p><strong>{linkEvent.name}</strong><br/>Confirm which stream shows this event. Titles are suggestions, not proof.</p>{deck.view?.deck.games.filter(g=>deck.view?.runtime.bindings[g.key]).map(game=>{
       const tab=deck.view?.tabs.find(t=>t.id===deck.view?.runtime.bindings[game.key].tabId);const suggestions=suggestEvents({title:tab?.title||game.title,url:game.url},cache.events);const suggestion=suggestions.find(s=>s.event.id===linkEvent.id);
-      return <button className="link-window-option" key={game.key} onClick={async()=>{if(await sports.command({type:'SPORTS_LINK',key:game.key,eventId:linkEvent.id}))setLinkEvent(null);}}><Monitor size={17}/><span><strong>{game.title}</strong><small>{suggestion?`Suggested · ${Math.round(suggestion.confidence*100)}% match${suggestions.length>1?' · multiple possible events':''}`:'Confirm manually'}</small></span><Link2 size={14}/></button>;
+      return <button className="link-window-option" key={game.key} onClick={async()=>{if(await sports.command({type:'SPORTS_LINK',key:game.key,eventId:linkEvent.id,provider:linkEvent.provider}))setLinkEvent(null);}}><Monitor size={17}/><span><strong>{game.title}</strong><small>{suggestion?`Suggested · ${Math.round(suggestion.confidence*100)}% match${suggestions.length>1?' · multiple possible events':''}`:'Confirm manually'}</small></span><Link2 size={14}/></button>;
     })}{!deck.view?.deck.games.length&&<p>Add a playing Chrome tab to GameDeck first.</p>}{linked(linkEvent)&&<button className="button secondary" onClick={async()=>{await sports.command({type:'SPORTS_UNLINK',key:linked(linkEvent)});setLinkEvent(null);}}>Remove association</button>}</section></div>}
   </section>;
 }
@@ -98,11 +151,11 @@ export function OverlayControls(){
       <label><input type="checkbox" checked={overlay.reserve} disabled={busy||!connected} onChange={e=>update({reserve:e.target.checked})}/>Reserve space</label>
     </div>
     {(notice||view?.cache.overlayStatus)&&<p role="status">{notice||view?.cache.overlayStatus}</p>}
-    {overlay.enabled&&!active&&<p>Desktop ticker is not running. Install the Windows helper for this extension and start at least one managed game, then retry. The compact ticker in CFB Live works without a helper.</p>}
+    {overlay.enabled&&!active&&<p>Desktop ticker is not running. Install the Windows helper for this extension and start at least one managed game, then retry. The compact ticker in Sports Hub works without a helper.</p>}
     <p>Browser ticker opens a regular Chrome window without a helper. Keep it visible beside your games; always-on-top, click-through, opacity and reserved space apply to the native desktop ticker.</p>
   </div>;
 }
 export function SportsPreferences(){
   const {view,command,busy}=useSports();const [name,setName]=useState(''),[url,setUrl]=useState('');
-  return <section className="sports-preferences"><h2>Custom streaming shortcuts</h2><p>Disney+ and DAZN are the defaults for Mexico. ESPN is used only for score data.</p><form className="inline-form" onSubmit={async e=>{e.preventDefault();if(await command({type:'SPORTS_SAVE_SERVICE',name,url})){setName('');setUrl('');}}}><input aria-label="Service shortcut name" placeholder="Service name" value={name} onChange={e=>setName(e.target.value)} required/><input aria-label="Service shortcut URL" placeholder="https://…" value={url} onChange={e=>setUrl(e.target.value)} required/><button className="button secondary" disabled={busy}>Add shortcut</button></form>{view?.settings.services.map(s=><div className="preset-row" key={s.id}><strong>{s.name}</strong><small>{s.domain}</small><button className="icon-button" aria-label={`Remove ${s.name} shortcut`} onClick={()=>void command({type:'SPORTS_REMOVE_SERVICE',id:s.id})}><Trash2 size={14}/></button></div>)}<label className="setting-row"><span>CFB background scores<small>30-second polling while live, slower when idle. Disabling leaves your streaming windows alone.</small></span><input type="checkbox" checked={view?.settings.enabled||false} onChange={e=>void command({type:'SPORTS_SETTINGS',patch:{enabled:e.target.checked}})}/></label><OverlayControls/></section>;
+  return <section className="sports-preferences"><h2>Custom streaming shortcuts</h2><p>Disney+ and DAZN are the defaults for Mexico. ESPN is used only for score data.</p><form className="inline-form" onSubmit={async e=>{e.preventDefault();if(await command({type:'SPORTS_SAVE_SERVICE',name,url})){setName('');setUrl('');}}}><input aria-label="Service shortcut name" placeholder="Service name" value={name} onChange={e=>setName(e.target.value)} required/><input aria-label="Service shortcut URL" placeholder="https://…" value={url} onChange={e=>setUrl(e.target.value)} required/><button className="button secondary" disabled={busy}>Add shortcut</button></form>{view?.settings.services.map(s=><div className="preset-row" key={s.id}><strong>{s.name}</strong><small>{s.domain}</small><button className="icon-button" aria-label={`Remove ${s.name} shortcut`} onClick={()=>void command({type:'SPORTS_REMOVE_SERVICE',id:s.id})}><Trash2 size={14}/></button></div>)}<label className="setting-row"><span>Background score updates<small>30-second polling while live, slower when idle. Disabling leaves your streaming windows alone.</small></span><input type="checkbox" checked={view?.settings.enabled||false} onChange={e=>void command({type:'SPORTS_SETTINGS',patch:{enabled:e.target.checked}})}/></label><OverlayControls/></section>;
 }

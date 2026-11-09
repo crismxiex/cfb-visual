@@ -36,7 +36,7 @@ export function GameAudio({gameKey}:{gameKey:string}) {
     <button className={`button secondary small listen-button ${solo?'listening':''}`} disabled={!tab||!view?.deck.audioEnabled} title="Hear only this game; mute the other managed games" aria-label={`Listen only to ${game?.title||'this game'}`} aria-pressed={solo} onClick={()=>void send({type:'LISTEN',key:gameKey})}><Headphones size={13}/>{solo?'Listening':'Listen'}</button>
     <button className={`icon-button ${muted?'audio-muted':''}`} disabled={!tab||!view?.deck.audioEnabled} title={muted?'Listen only to this tab':'Mute all managed tabs'} aria-label={`${muted?'Unmute':'Mute'} ${game?.title||'this game'}`} aria-pressed={muted} onClick={()=>void send({type:'TOGGLE_MUTE',key:gameKey})}>{muted?<VolumeX size={16}/>:<Volume2 size={16}/>}</button>
     <GameVolume gameKey={gameKey} title={game?.title||'this game'} volume={player?.volume} available={!!tab&&!!view?.deck.audioEnabled&&!!player?.available}/>
-    {player&&!player.available&&<span className="player-audio-status" title={player.status}>Player volume unavailable</span>}
+    {view?.deck.audioEnabled&&player&&!player.available&&<span className="player-audio-status">{player.status}</span>}
   </div>;
 }
 

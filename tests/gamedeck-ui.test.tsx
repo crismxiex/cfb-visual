@@ -98,8 +98,29 @@ async function scores(linked=true){
   const cache=emptyCache();cache.date=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());cache.updatedAt=Date.now();cache.events=[{id:'99',provider:'espn',name:'BYU Cougars at Utah Utes',date:new Date().toISOString(),home:{id:'254',name:'Utah Utes',shortName:'Utah',abbreviation:'UTAH',score:14},away:{id:'252',name:'BYU Cougars',shortName:'BYU',abbreviation:'BYU',score:7},status:'live',statusText:'Q3 · 8:00',quarter:3,clock:'8:00',networks:[]}];
   const command=vi.fn(async()=>({settings,cache,access:true}));
   await act(async()=>useSports.setState({view:{settings,cache,access:true},command}));
-  await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='CFB Live')!.click());return command;
+  await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Sports Hub')!.click());return command;
 }
+it('selects NFL from the Sports Hub and shows its scores without college filters',async()=>{
+  await connectPlayers();
+  const command=await scores(false);
+  const selector=container.querySelector<HTMLSelectElement>('[aria-label="Score league"]')!;
+  await act(async()=>{selector.value='nfl';selector.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(command).toHaveBeenCalledWith({type:'SPORTS_SETTINGS',patch:{league:'nfl'}});
+  const current=useSports.getState().view!;
+  const game=current.cache.events[0];
+  const nfl={...game,provider:'espn-nfl',name:'Buffalo Bills at Miami Dolphins',
+    away:{...game.away,id:'2',name:'Buffalo Bills',shortName:'Bills',abbreviation:'BUF'},
+    home:{...game.home,id:'15',name:'Miami Dolphins',shortName:'Dolphins',abbreviation:'MIA'},
+  };
+  await act(async()=>useSports.setState({view:{
+    ...current,settings:{...current.settings,league:'nfl',filter:'ranked',rankedOnly:true},
+    cache:{...current.cache,events:[nfl]},
+  }}));
+  expect(container.querySelector('[aria-label="NFL Live"]')).not.toBeNull();
+  expect(container.querySelector('.score-card')?.textContent).toContain('Bills');
+  expect(container.querySelector('[aria-label="Conference filter"]')).toBeNull();
+  expect(container.textContent).not.toContain('Top 25');
+});
 it('only Disney+ and DAZN appear as default streaming-service destinations',()=>{
   const services=container.querySelector('[aria-label="Streaming Services"]')!;expect(services.textContent).toContain('Disney+ Mexico');expect(services.textContent).toContain('DAZN Mexico');expect(services.textContent).not.toContain('ESPN');
 });
@@ -110,7 +131,7 @@ it('scoreboard Make Main promotes through the existing controller with audio sel
   await scores();await act(async()=>[...container.querySelectorAll('.score-card-actions button')].find(b=>b.textContent==='Make Main')!.dispatchEvent(new MouseEvent('click',{bubbles:true})));expect(send).toHaveBeenCalledExactlyOnceWith({type:'PROMOTE',key:'g3',forceAudio:true});
 });
 it('an unlinked card opens manual linking instead of guessing an audio target',async()=>{
-  const command=await scores(false);await act(async()=>container.querySelector<HTMLElement>('.score-card')!.click());expect(send).not.toHaveBeenCalled();expect(container.querySelector('[aria-label="Link scoreboard event to window"]')).not.toBeNull();await act(async()=>container.querySelector<HTMLElement>('.link-window-option')!.click());expect(command).toHaveBeenCalledWith({type:'SPORTS_LINK',key:'g1',eventId:'99'});
+  const command=await scores(false);await act(async()=>container.querySelector<HTMLElement>('.score-card')!.click());expect(send).not.toHaveBeenCalled();expect(container.querySelector('[aria-label="Link scoreboard event to window"]')).not.toBeNull();await act(async()=>container.querySelector<HTMLElement>('.link-window-option')!.click());expect(command).toHaveBeenCalledWith({type:'SPORTS_LINK',key:'g1',eventId:'99',provider:'espn'});
 });
 it('Show ticker enables score updates and requests missing data and helper access together',async()=>{
   const request=await connectPlayers();const settings=defaults(),command=vi.fn(async()=>true);

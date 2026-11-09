@@ -21,6 +21,18 @@ describe('ESPN schema validation',()=>{
   it('only labels an AP ranking when the named, dated poll supplies it',()=>{const ranks=normalizeRankings({rankings:[{name:'AP Top 25',ranks:[{current:3,team:{id:'2483'},date:'2026-11-01T07:00Z'}]}]},'2026-11-07');expect(ranks['2483'].poll).toBe('AP Top 25');expect(normalizeRankings({rankings:[{name:'AP Top 25',ranks:[{current:3,team:{id:'2483'},date:'2026-11-01T07:00Z'}]}]},'2026-12-07')).toEqual({});});
   it('requests verified FBS limit=100 and two dates, then deduplicates Mexico-local events',async()=>{const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('rankings')?{rankings:[]}:{events:[event()]}),{status:200}));const provider=new EspnScoreProvider(fetcher as any);const result=await provider.fetchScores('2026-11-07');expect(result.events).toHaveLength(1);expect(fetcher.mock.calls[0][0]).toContain('groups=80&limit=100&dates=20261107');expect(fetcher.mock.calls[1][0]).toContain('dates=20261108');});
   it('propagates Retry-After for exponential backoff',async()=>{const provider=new EspnScoreProvider(async()=>new Response('{}',{status:429,headers:{'Retry-After':'120'}}));await expect(provider.fetchScores('2026-11-07')).rejects.toMatchObject({retryAfter:120000});});
+  it('uses the NFL endpoint and avoids college groups and ranking calls',async()=>{
+    const fetcher=vi.fn(async(_url:string)=>Response.json({events:[event()]}));
+    const provider=new EspnScoreProvider(fetcher,undefined,undefined,'nfl');
+    const result=await provider.fetchScores('2026-11-07');
+    expect(fetcher.mock.calls.map(([url])=>url)).toEqual([
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=20261107',
+      'https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=20261108',
+    ]);
+    expect(result.events).toHaveLength(1);
+    expect(result.events[0].provider).toBe('espn-nfl');
+    expect(result.rankLabel).toBe('');
+  });
   it('retains the six-hour named-poll cache across new provider instances',async()=>{
     let saved:any;const store={read:async()=>saved,write:async(v:any)=>{saved=v;}};
     const fetcher=vi.fn(async(url:string)=>new Response(JSON.stringify(url.includes('rankings')?{rankings:[{name:'AP Top 25',ranks:[{current:3,team:{id:'2483'},date:'2026-11-01T07:00Z'}]}]}:{events:[event()]}),{status:200}));const now=()=>Date.parse('2026-11-07T22:00Z');
@@ -33,7 +45,50 @@ describe('ESPN schema validation',()=>{
 });
 describe('background scoreboard scheduling',()=>{
   function fixture(){let saved:any={gamedeckSports:{...defaults(),enabled:true},gamedeckScores:emptyCache()};let now=Date.parse('2026-11-07T22:00Z');const provider={id:'test',name:'test',fetchScores:vi.fn(async()=>batch())};const api:any={storage:{local:{get:async()=>structuredClone(saved),set:async(v:any)=>Object.assign(saved,structuredClone(v))}},permissions:{contains:async()=>true},alarms:{create:vi.fn(async()=>{}),clear:vi.fn(async()=>{})}};const service=createScoreboardService(api,{request:async()=>({}) as any},provider,()=>now);return {api,service,provider,advance:(n:number)=>now+=n,get saved(){return saved;}};}
+  it('refreshes through the default provider when worker fetch requires the global receiver',async()=>{
+    const f=fixture();
+    vi.stubGlobal('fetch',async function(this:typeof globalThis,url:string){
+      if(this!==globalThis)throw new TypeError("Failed to execute 'fetch' on 'WorkerGlobalScope': Illegal invocation");
+      return Response.json(url.includes('/rankings')?{rankings:[]}:{events:[event()]});
+    });
+    try{
+      const service=createScoreboardService(f.api,{request:async()=>({}) as any},undefined,()=>Date.parse('2026-11-07T22:00Z'));
+      const result=await service.request({type:'SPORTS_REFRESH'}) as Awaited<ReturnType<typeof service.view>>;
+      expect(result.cache.error).toBe('');
+      expect(result.cache.events).toHaveLength(1);
+    }finally{vi.unstubAllGlobals();}
+  });
   it('deduplicates simultaneous refreshes and schedules live polling at thirty seconds',async()=>{const f=fixture();await Promise.all([f.service.refresh(true),f.service.refresh(true)]);expect(f.provider.fetchScores).toHaveBeenCalledTimes(1);const v=await f.service.view();expect(v.cache.nextPollAt-v.cache.updatedAt).toBe(30000);expect(f.api.alarms.create).toHaveBeenCalled();});
+  it('switches leagues on the same date without mixing caches or favorites',async()=>{
+    const f=fixture();
+    const {league: _league,...legacySettings}=defaults();
+    f.saved.gamedeckSports={...legacySettings,enabled:true,favorites:['194'],filter:'ranked'};
+    vi.stubGlobal('fetch',async()=>Response.json({events:[event('2')]}));
+    let finishCollege: (value:ReturnType<typeof batch>)=>void=()=>{};
+    try{
+      const service=createScoreboardService(f.api,{request:async()=>({}) as any},f.provider,()=>Date.parse('2026-11-07T22:00Z'));
+      await service.refresh(true);
+      expect((await service.view()).settings.league).toBe('cfb');
+      f.provider.fetchScores.mockImplementationOnce(()=>new Promise(resolve=>{finishCollege=resolve;}));
+      const oldRequest=service.refresh(true);
+      await vi.waitFor(()=>expect(f.provider.fetchScores).toHaveBeenCalledTimes(2));
+      await service.request({type:'SPORTS_SETTINGS',patch:{league:'nfl'}});
+      await service.refresh(true);
+      finishCollege({...batch(),events:[]});
+      await oldRequest;
+      const nfl=await service.view();
+      expect(nfl.cache.events.map(e=>e.provider)).toEqual(['espn-nfl']);
+      expect(f.saved.gamedeckScores.events[0].provider).toBe('espn');
+      expect(f.saved.gamedeckNflScores.events[0].provider).toBe('espn-nfl');
+      expect(selectEvents(nfl.cache.events,nfl.settings)).toHaveLength(1);
+      expect(selectEvents(nfl.cache.events,{...nfl.settings,filter:'favorites'})).toEqual([]);
+      await service.request({type:'SPORTS_FAVORITE',teamId:'194'});
+      expect((await service.view()).settings.favorites).toEqual(['194','nfl:194']);
+    }finally{
+      finishCollege(batch());
+      vi.unstubAllGlobals();
+    }
+  });
   it('retains cached scores and backs off on failures',async()=>{const f=fixture();await f.service.refresh(true);f.provider.fetchScores.mockRejectedValue(new ProviderError('HTTP 429',120000));f.advance(30000);const v=await f.service.refresh(true);expect(v.cache.events).toHaveLength(1);expect(v.cache.error).toContain('429');expect(v.cache.failures).toBe(1);expect(v.cache.nextPollAt).toBeGreaterThanOrEqual(v.cache.attemptAt+120000);});
   it('never produces alerts on an initial snapshot',()=>{const s=defaults();s.favorites=['2483'];expect(detectChanges([],batch().events,s,1)).toEqual([]);});
   it('detects a score change without claiming a touchdown',()=>{const s=defaults();s.favorites=['2483'];const before=batch().events;const next=normalizeScoreboard({events:[event('1','14','13')]});const alerts=detectChanges(before,next,s,2);expect(alerts).toHaveLength(1);expect(alerts[0].message).toContain('score changed');expect(alerts[0].message).not.toMatch(/touchdown/i);});
@@ -65,6 +120,16 @@ describe('background scoreboard scheduling',()=>{
   });
 });
 describe('ticker data selection',()=>{
+  it('keeps native ticker picks separate by league even when event IDs match',()=>{
+    const settings={...defaults(),league:'nfl' as const,enabled:true,date:'2026-11-07'};
+    const live=normalizeScoreboard({events:[event('2')]},{},'nfl')[0];
+    const final={...live,id:'1',status:'final' as const};
+    const cache={...emptyCache('nfl'),date:settings.date,events:[live,final]};
+    settings.overlay.eventIds=['1'];
+    expect(scoreOverlayCommand({settings,cache,access:true}).events).toEqual([live]);
+    settings.overlay.eventIds.push('nfl:1');
+    expect(scoreOverlayCommand({settings,cache,access:true}).events).toEqual([final]);
+  });
   it('never sends the previous date to the native ticker while fetching another day',()=>{
     const settings={...defaults(),enabled:true,date:'2026-11-08'},cache={...emptyCache(),...batch(),updatedAt:Date.parse('2026-11-07T22:00Z')};settings.overlay.enabled=true;
     const command=scoreOverlayCommand({settings,cache,access:true},Date.parse('2026-11-07T22:01Z'));

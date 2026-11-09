@@ -10,7 +10,9 @@ A launcher first looks for an existing service homepage, then for existing playi
 
 Additional HTTPS service shortcuts can be saved in Preferences. Credentials in URLs are rejected and recognized token fields are removed before persistence. ESPN/ESPN+/WatchESPN shortcuts are rejected.
 
-Open **CFB Live**, select **Enable CFB scores**, and grant optional access to `site.api.espn.com`. The app fetches real data only; preview mode has no fabricated games or scores. The scoreboard includes All FBS, Live, Top 25, Big Ten, SEC, Big 12, ACC and Favorites shortcuts, plus conference/status/name/ranked filters, Mexico-local dates, game cards and a compact ticker. The Oregon star button favorites ESPN team ID 2483, verified from the live response. Favorites and filters persist locally.
+Open **Sports Hub**, select **Enable scores**, and grant optional access to `site.api.espn.com`. The app fetches real data only; preview mode has no fabricated games or scores. The scoreboard includes All FBS, Live, Top 25, Big Ten, SEC, Big 12, ACC and Favorites shortcuts, plus conference/status/name/ranked filters, Mexico-local dates, game cards and a compact ticker. The Oregon star button favorites ESPN team ID 2483, verified from the live response. Favorites and filters persist locally.
+
+Choose **NFL** from the league menu to see NFL matchups, kickoff times, live scores, and final results. Date, search, status, and Favorites filters work for both leagues. Each league keeps its own cache and saved favorites and ticker picks.
 
 ## ESPN endpoint research
 
@@ -36,6 +38,7 @@ Actual normalized-provider verification returned 51 events for November 7, inclu
 
 ```powershell
 npm run verify:scores -- 2026-11-07
+npm run verify:scores -- 2026-11-08 nfl
 ```
 
 The endpoint is [ESPN's public college-football scoreboard](https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=100&dates=20261107). This verification does not scrape Google or streaming pages.
@@ -72,7 +75,7 @@ Associations persist as a stable GameDeck game key plus `{provider: 'espn', even
 
 ## Optional native score ticker
 
-For a ticker without a native installation, choose **CFB Live → Desktop score ticker → Open browser ticker** (also available in Preferences). This opens or restores a single regular Chrome popup on the selected monitor. It uses the same live score cache, confirmed event links and audio commands. It does not move streaming windows, reserve layout space or request native messaging. Chrome title bars and ordinary Z-order remain; always-on-top, click-through and window opacity require the native option below.
+For a ticker without a native installation, choose **Sports Hub → Desktop score ticker → Open browser ticker** (also available in Preferences). This opens or restores a single regular Chrome popup on the selected monitor. It uses the same live score cache, confirmed event links and audio commands. It does not move streaming windows, reserve layout space or request native messaging. Chrome title bars and ordinary Z-order remain; always-on-top, click-through and window opacity require the native option below.
 
 The ticker uses the existing optional Native Messaging companion, extended with a separate WinForms presentation module in `native/ScoreOverlay.cs`. It draws formatted score text in its own non-activating, topmost window. It does not embed a browser, inject a score overlay into Disney+/DAZN, access video, capture pixels, read credentials or make native network requests.
 
@@ -99,6 +102,6 @@ The helper source compiles in this environment. Windows returned **Access is den
 | `src/sports/store.ts`, `ui.tsx`, `style.css` | Integrated score UI and state |
 | `src/native.ts`, `native/ScoreOverlay.cs` | Optional native ticker transport/presentation |
 
-`gamedeckSports` stores favorites, filters, confirmed associations, overlay preferences and custom services in `chrome.storage.local`. `gamedeckScores` stores normalized public scores, update/backoff timestamps and recent alert signatures. `gamedeckScoreRanks` stores a compact named-poll cache, without the source’s redundant team images/metadata. These are separate from the original `gamedeck` window-manager state and ephemeral session bindings. No streaming credentials, tokens or cookies are stored.
+`gamedeckSports` stores favorites, filters, confirmed associations, overlay preferences and custom services in `chrome.storage.local`. `gamedeckScores` and `gamedeckNflScores` store each league’s normalized scores, refresh timestamps, and recent alerts. `gamedeckScoreRanks` stores a compact named-poll cache, without the source’s redundant team images/metadata. These are separate from the original `gamedeck` window-manager state and ephemeral session bindings. No streaming credentials, tokens or cookies are stored.
 
 Tests cover schema drift/missing fields, named polls, complete-date queries, rate limits, cache retention, deduplication, favorite/filtered views, launchers without navigation, manual matching/linking, score-card audio/promotion, optional helper compatibility and ticker reservation/restoration. Live ESPN data was verified; live authenticated-provider playback and native rendering remain separate acceptance checks.

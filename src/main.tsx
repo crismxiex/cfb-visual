@@ -42,8 +42,8 @@ export function App(){
     <aside className="sidebar">
       <a className="brand" href="#" onClick={()=>setSection('Workspace')}><span className="brand-mark"><i/><i/><i/></span>GameDeck<span className="beta">LOCAL</span></a>
       <div className="sidebar-label">GAME DAY CONTROL</div>
-      <nav>{[{name:'Workspace',icon:LayoutDashboard},{name:'CFB Live',icon:Monitor},{name:'Saved layouts',icon:Save},{name:'Preferences',icon:Settings2}].map(({name,icon:Icon})=><button key={name} className={section===name?'nav-item active':'nav-item'} onClick={()=>setSection(name)}><Icon size={18}/>{name}{name==='Workspace'&&<span className="nav-count">{deck.games.length}</span>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="privacy-icon"><ShieldCheck size={20}/></div><strong>Your streams stay yours.</strong><p>Real Chrome windows.<br/>Your profile. Your sessions.</p><button className="help-link" onClick={()=>setSection('How it works')}><CircleHelp size={15}/>How GameDeck works<ArrowUpRight size={14}/></button><div className="version">GAMEDECK <span>v2.4.2</span></div></div>
+      <nav>{[{name:'Workspace',icon:LayoutDashboard},{name:'Sports Hub',icon:Monitor},{name:'Saved layouts',icon:Save},{name:'Preferences',icon:Settings2}].map(({name,icon:Icon})=><button key={name} className={section===name?'nav-item active':'nav-item'} onClick={()=>setSection(name)}><Icon size={18}/>{name}{name==='Workspace'&&<span className="nav-count">{deck.games.length}</span>}</button>)}</nav>
+      <div className="sidebar-bottom"><div className="privacy-icon"><ShieldCheck size={20}/></div><strong>Your streams stay yours.</strong><p>Real Chrome windows.<br/>Your profile. Your sessions.</p><button className="help-link" onClick={()=>setSection('How it works')}><CircleHelp size={15}/>How GameDeck works<ArrowUpRight size={14}/></button><div className="version">GAMEDECK <span>v2.5.1</span></div></div>
     </aside>
     <div className="body"><header className="topbar"><div className="breadcrumb">GameDeck <ChevronRight size={14}/><span>{section}</span></div><div className="connection"><span className={connected?'status-dot':'status-dot offline'}/>{connected?'Chrome connected':'Extension preview'}<span className="divider"/><ShieldCheck size={14}/>On your device</div></header>
     <main>
@@ -51,7 +51,7 @@ export function App(){
       {!connected&&<div className="notice"><MonitorUp size={20}/><div><strong>Ready for your Chrome profile</strong><p>This browser preview cannot manage tabs. Build the project and load <code>dist</code> at <code>chrome://extensions</code> to connect your real windows.</p></div></div>}
       {error&&<div role="alert" className="notice error"><CircleHelp size={20}/><p>{error}</p><button aria-label="Dismiss error" onClick={clearError}><X size={16}/></button></div>}
       {runtime.warnings.map((w,i)=><div className="notice warning" key={i}>{w}</div>)}
-      {section==='CFB Live'&&<><StreamingServices/><Scoreboard/></>}
+      {section==='Sports Hub'&&<><StreamingServices/><Scoreboard/></>}
       {section==='Workspace'&&<>
         <StreamingServices/><Scoreboard compact/>
         <form className="url-form" onSubmit={addUrl}><div className="link-icon"><ExternalLink size={19}/></div><input aria-label="Game URL" value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a game URL..." required/><span className="url-hint">Disney+ · DAZN · any HTTPS site</span><button className="button primary" disabled={busy||!url.trim()}><Plus size={16}/>Add game</button></form>
