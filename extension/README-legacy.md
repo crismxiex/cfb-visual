@@ -58,7 +58,7 @@ Main game and audio are independent. Promoting a game does not change which game
 
 The controller’s **Layout overview** is a diagram of the arrangement, not a video preview. Click a diagram box for audio or double-click it to promote a game; the actual games remain in their Chrome windows.
 
-Add or remove games while the multibox is arranged and it reflows automatically. Closing a game window also reflows the remaining players. You can watch three, four, five, seven, or up to nine games. Use each original player’s own volume controls; the controller selects which tab is muted or unmuted.
+The multibox reflows when you add, remove, or close games. Adjust volume in each player and use the controller to choose which tab you hear.
 
 ## Shortcuts
 

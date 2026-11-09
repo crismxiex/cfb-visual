@@ -1,14 +1,10 @@
 # GameDeck — local sports window manager
 
-GameDeck arranges your existing, signed-in Chrome sports tabs as real independent popup windows. The React dashboard is a layout map and control panel. Your original streaming pages continue running in the same Chrome profile; no video is captured, embedded, mirrored, proxied, or retransmitted.
+GameDeck is a sports window manager for Chrome on Windows. Arrange streams from your signed-in Chrome profile, save layouts, and switch game audio from one dashboard. Streams play in their original browser tabs.
 
-**New in v2.5.0.** Open **Sports Hub** and choose **NFL** or **College football** from the league menu. The board and tickers follow the selected league. Each league keeps its own cached scores, favorites, and ticker picks.
+GameDeck started with college football (CFB) and the NFL. Sports Hub provides schedules, live scores, and tickers for both. **NBA, MLB, and March Madness** score coverage is planned.
 
-**New in v2.4.2 — Reliability fixes:** cross-monitor saved layouts restore native pairing safely; replacement tabs retain their audio selection; volume sliders stay responsive during updates; tickers exclude scores from a different date. **Sports Hub → Desktop score ticker → Open browser ticker** opens a separate Chrome score window without a helper. Native ticker startup now enables score access, reports setup errors and offers **Retry ticker**. Its Windows helper still needs to be installed and permitted to execute.
-
-**New in v2.4.1 — Player volume:** per-game volume sliders and player unmuting from the Command Center. Reload the extension, then click **Enable volume controls** once to grant access for your managed providers. Listen and audio switching recover muted players without opening their windows.
-
-**New in v2.4 — Sports Hub:** Disney+ and DAZN Mexico launchers; real FBS score cards/ticker, favorites, confirmed event-to-window linking, score-card audio/main controls, in-tile scores and an optional native desktop ticker. See [Sports Hub setup, provider research, architecture and verification](docs/SPORTS-HUB.md). The completed provider was checked against the live feed; the optional native overlay was compiled but Windows denied executing its rebuilt helper. Open **Sports Hub → Enable scores** after reloading the extension. Chrome 120+ is required.
+Open **Sports Hub → Enable scores** to choose a league, favorite teams, and link scores to your streams. Use **Open browser ticker** for a separate Chrome score window or install the Windows helper for the native desktop ticker. Chrome 120 or later is required. [Sports Hub guide](docs/SPORTS-HUB.md)
 
 ## Windows 11 setup
 
@@ -59,10 +55,10 @@ HTTP previews explicitly display **Extension preview** and cannot manage tabs. T
 - Promote any game to slot 1, explicitly focus its window, minimize, or restore it.
 - Edit your own game titles, teams, and scores. Nothing is scraped from protected content. **Connected** means the tab exists, not that playback was verified.
 - **Remove, keep window open** stops management while keeping the page running. **Return to regular tab** moves the same tab to its original normal window or a replacement. **Close browser tab…** requires a separate confirmation.
-- Save named arrangements, restore the previous arrangement, configure spacing, and choose custom grids with 1–3 rows and columns (up to nine games).
+- Save named arrangements, restore the previous arrangement, configure spacing, and set up custom grids.
 - Select a monitor using its actual work area, including taskbar exclusions and negative monitor coordinates.
 
-Built-in layouts: Single Game; Two Side by Side; Two Main + Secondary (70/30); Three Main + Two (65/35); Three Horizontal (one above two); Four Grid; Four Main + Three; Six Grid (3×2 landscape or 2×3 portrait). Adding a game automatically selects a layout with enough usable slots, preserving existing tabs, game positions, main game and audio. Main + Two grows to Main + Three for the fourth game, then to Six Grid and a nine-slot custom grid as needed. A custom grid expands automatically. A larger current layout stays selected. Only impossible monitor sizes or more than nine games block addition; GameDeck checks this before opening a new URL. Explicitly selecting or restoring an undersized layout is still rejected before geometry changes. Unused slots remain available.
+Choose from built-in grids, side-by-side views, and layouts that give the main game more space. As you add games, GameDeck looks for a layout that fits your lineup and display while preserving existing tabs, positions, and audio selection.
 
 ## Clean player view (v2.3)
 

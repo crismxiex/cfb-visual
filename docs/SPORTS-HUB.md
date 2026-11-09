@@ -1,4 +1,4 @@
-# Sports Hub — GameDeck 2.4
+# GameDeck Sports Hub
 
 The existing React dashboard, Chrome window controller, clean player presentation, layout engine and exclusive audio manager remain in place. Sports Hub is an additional data and linking layer, not a new browser, backend, embedded streaming player or audio manager.
 
@@ -10,7 +10,7 @@ A launcher first looks for an existing service homepage, then for existing playi
 
 Additional HTTPS service shortcuts can be saved in Preferences. Credentials in URLs are rejected and recognized token fields are removed before persistence. ESPN/ESPN+/WatchESPN shortcuts are rejected.
 
-Open **Sports Hub**, select **Enable scores**, and grant optional access to `site.api.espn.com`. The app fetches real data only; preview mode has no fabricated games or scores. The scoreboard includes All FBS, Live, Top 25, Big Ten, SEC, Big 12, ACC and Favorites shortcuts, plus conference/status/name/ranked filters, Mexico-local dates, game cards and a compact ticker. The Oregon star button favorites ESPN team ID 2483, verified from the live response. Favorites and filters persist locally.
+Open **Sports Hub**, select **Enable scores**, and grant optional access to `site.api.espn.com`. Choose college football or NFL from the league menu. Both boards support team search, status and Favorites filters, Mexico City dates, game cards, and a compact ticker. The college football board also offers conference and ranked-game filters and an Oregon shortcut. Favorites and filters are saved locally.
 
 Choose **NFL** from the league menu to see NFL matchups, kickoff times, live scores, and final results. Date, search, status, and Favorites filters work for both leagues. Each league keeps its own cache and saved favorites and ticker picks.
 
@@ -41,7 +41,7 @@ npm run verify:scores -- 2026-11-07
 npm run verify:scores -- 2026-11-08 nfl
 ```
 
-The endpoint is [ESPN's public college-football scoreboard](https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=100&dates=20261107). This verification does not scrape Google or streaming pages.
+The verification script calls ESPN's public feeds directly. [College football feed](https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=100&dates=20261107) · [NFL feed](https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=20261108)
 
 ### Schema and missing fields
 
