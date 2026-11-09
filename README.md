@@ -12,11 +12,7 @@ The production extension is already built in **dist/**. Normal layout and audio 
 
 1. If Saturday is currently managing your tabs, use its **End session & restore tabs** first. Do not let two controllers manage the same tabs.
 2. Keep Chrome open normally in the profile where your streaming services are signed in. No restart or debugging flag is required.
-3. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose:
-
-   ```text
-   dist/
-   ```
+3. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose the **dist/** folder inside your GameDeck project.
 
 4. Pin **GameDeck — Sports Window Manager** from Chrome's extensions menu and click its icon. The dashboard opens in its own window.
 5. Choose **Add existing tab**, find the playing game, and click its row. GameDeck adopts that exact tab without reopening its URL.

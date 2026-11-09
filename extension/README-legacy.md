@@ -11,9 +11,7 @@ This version uses the game tabs you already have open and signed in to. It moves
 3. Close any older Saturday controller tabs, then click Saturday’s extension icon while viewing one of your game tabs. The new controller says **CHROME MULTIBOX CONTROLLER**.
 4. Choose **Add game tabs**, select your existing game tabs, choose your viewing monitor, and click **Arrange games**.
 
-If the extension is not yet installed, enable **Developer mode** at `chrome://extensions`, choose **Load unpacked**, and select:
-
-`extension/`
+To install the legacy extension, enable **Developer mode** at `chrome://extensions`, choose **Load unpacked**, and select the **extension/** folder inside the project.
 
 No server, native executable, npm install, or build is required to use the extension.
 
