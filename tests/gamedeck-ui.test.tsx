@@ -62,6 +62,13 @@ async function connectPlayers(granted=true){
   view.tabs.forEach((t,i)=>t.url=i===1?'https://www.disneyplus.com/watch/2':'https://www.dazn.com/watch/'+i);
   await act(async()=>useDeck.setState({view,connected:true}));return request;
 }
+it('reloads a game from the lineup without selecting it for audio',async()=>{
+  await connectPlayers();
+  const button=container.querySelector<HTMLButtonElement>('[aria-label="Reload Game 2"]')!;
+  expect(button.disabled).toBe(false);
+  await act(async()=>button.click());
+  expect(send).toHaveBeenCalledExactlyOnceWith({type:'RELOAD_TAB',key:'g2'});
+});
 it('Clean player view requests only the selected provider origins before sending its command',async()=>{
   const request=await connectPlayers();const button=[...container.querySelectorAll('button')].find(b=>b.textContent==='Clean player view')!;
   await act(async()=>button.click());expect(request).toHaveBeenCalledExactlyOnceWith({permissions:['scripting'],origins:['https://www.dazn.com/*','https://www.disneyplus.com/*']});expect(send).toHaveBeenCalledWith({type:'PLAYER_VIEW',enabled:true,fit:'contain'});

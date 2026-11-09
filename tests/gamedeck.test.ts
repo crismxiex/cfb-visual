@@ -18,6 +18,7 @@ function fixture() {
     tabs:{
       query:async(q:any)=>structuredClone([...tabs.values()].filter(t=>q.windowId==null||t.windowId===q.windowId)),
       get:async(id:number)=>{if(!tabs.has(id))throw new Error('Tab closed');return structuredClone(tabs.get(id));},
+      reload:async(id:number)=>{if(!tabs.has(id))throw new Error('Tab closed');calls.push(['tabs.reload',id]);},
       update:async(id:number,props:any)=>{calls.push(['tabs.update',id,props]);if(!tabs.has(id))throw new Error('Tab closed');const {muted,...rest}=props;Object.assign(tabs.get(id),rest);if(muted!==undefined)tabs.get(id).mutedInfo={muted,reason:'extension',extensionId:'gamedeck-test'};return structuredClone(tabs.get(id));},
       move:async(id:number,props:any)=>{calls.push(['tabs.move',id,props]);const t=tabs.get(id);if(windows.get(t.windowId)?.type!=='normal'||windows.get(props.windowId)?.type!=='normal')throw new Error('Only normal windows can use tabs.move');move(t,props.windowId);t.index=props.index;return structuredClone(t);},
       remove:async(id:number)=>{calls.push(['tabs.remove',id]);tabs.delete(id);},
@@ -111,6 +112,23 @@ describe('URL validation and identity',()=>{
   });
 });
 describe('real-window orchestration contract',()=>{
+  it('reloads the requested tab in place and keeps the lineup and audio selection',async()=>{
+    const f=fixture();
+    await f.add(1);
+    const before=await f.add(2);
+    const key=before.deck.games[1].key;
+    f.calls.length=0;
+    const after=await f.controller.request({type:'RELOAD_TAB',key});
+    expect(f.calls.filter(([name])=>name.startsWith('tabs.')||name.startsWith('windows.'))).toEqual([['tabs.reload',2]]);
+    expect(after.deck).toEqual(before.deck);
+    expect(after.runtime.bindings[key]).toEqual(before.runtime.bindings[key]);
+    expect(after.runtime.audio).toEqual(before.runtime.audio);
+
+    f.tabs.delete(2);
+    f.calls.length=0;
+    await expect(f.controller.request({type:'RELOAD_TAB',key})).rejects.toThrow(/unavailable/);
+    expect(f.calls.some(([name])=>name==='tabs.reload')).toBe(false);
+  });
   it('adopts the exact existing tab and swaps geometry without navigation or recreation',async()=>{
     const f=fixture();await f.add(1);const v=await f.add(2);f.calls.length=0;
     const result=await f.controller.request({type:'SWAP',key:v.deck.games[1].key,other:v.deck.games[0].key});

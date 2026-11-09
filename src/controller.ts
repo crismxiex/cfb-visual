@@ -278,7 +278,13 @@ export function createController(api: typeof chrome) {
         const monitor=(await screens()).find(d=>d.id===deck.displayId);if(!monitor)throw new Error('Choose an available monitor.');
         calculateLayout(displayArea(monitor,message.mode as Deck['displayMode'],runtime.scoreOverlay),deck.layout,deck.gap,deck.custom);remember();deck.displayMode=message.mode as Deck['displayMode'];await apply();
       } else if(message.type==='SELECT') {if(deck.games.some(g=>g.key===key)){deck.selected=key;if(deck.audioEnabled)await audio.select(key);}}
-      else if(message.type==='FOCUS') await focus(key);
+      else if(message.type==='RELOAD_TAB') {
+        const binding=runtime.bindings[key];
+        if(!binding)throw new Error('This game is unavailable. Reopen it before reloading.');
+        await api.tabs.reload(binding.tabId);
+        delete binding.playerAudio;
+        delete binding.playerViewEnabled;
+      } else if(message.type==='FOCUS') await focus(key);
       else if(message.type==='CYCLE_FOCUS') {
         const games=deck.games.filter(g=>runtime.bindings[g.key]);
         if(games.length) await focus(games[(games.findIndex(g=>g.key===deck.selected)+1)%games.length].key);

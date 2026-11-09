@@ -48,7 +48,7 @@ HTTP previews explicitly display **Extension preview** and cannot manage tabs. T
 - Paste HTTPS URLs with validation, normalization, existing-tab reuse, duplicate prevention, first-free-slot assignment, and immediate layout application.
 - Search existing normal/popup website tabs, including Disney+, ESPN, DAZN, and other HTTPS sites.
 - Drag to swap occupied positions or move into an empty slot. The swap button also lets you click a destination in the layout map.
-- Promote any game to slot 1, explicitly focus its window, minimize, or restore it.
+- Promote any game to slot 1, focus its window, minimize or restore it, or reload its tab from the lineup.
 - Edit your own game titles, teams, and scores. Nothing is scraped from protected content. **Connected** means the tab exists, not that playback was verified.
 - **Remove, keep window open** stops management while keeping the page running. **Return to regular tab** moves the same tab to its original normal window or a replacement. **Close browser tab…** requires a separate confirmation.
 - Save named arrangements, restore the previous arrangement, configure spacing, and set up custom grids.
