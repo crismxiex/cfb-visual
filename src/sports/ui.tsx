@@ -2,7 +2,7 @@ import {useEffect,useState} from 'react';
 import {ArrowUpRight,Bell,BellOff,ChevronDown,Link2,Monitor,Plus,Radio,RefreshCw,Star,Trash2,Volume2,X} from 'lucide-react';
 import {useDeck} from '../store';
 import {useSports} from './store';
-import {CONFERENCES,defaults,emptyCache,leagueId,live,mexicoDate,scoreText,selectEvents,stale,SCORE_CACHE_KEYS,SCORE_LEAGUES} from './types';
+import {CONFERENCES,defaults,emptyCache,leagueId,live,MEXICO_TZ,mexicoDate,scoreText,selectEvents,stale,SCORE_CACHE_KEYS,SCORE_LEAGUES} from './types';
 import type {ScoreEvent,ScoreLeague,ScoreTeam,SportsSettings,SportsPatch,OverlaySettings} from './types';
 import {ESPN_ACCESS} from './espn';
 import {DEFAULT_SERVICES} from './services';
@@ -10,14 +10,14 @@ import type {LaunchResult} from './services';
 import {suggestEvents} from './matcher';
 import './style.css';
 
-const time=(value:string|number)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Mexico_City',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
+const time=(value:string|number)=>new Intl.DateTimeFormat('en-US',{timeZone:MEXICO_TZ,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));
 const status=(e:ScoreEvent)=>e.status==='scheduled'?time(e.date):e.status==='final'?'Final':e.status==='halftime'?'Halftime':e.statusText;
 export function SportsBootstrap(){
   const connected=useDeck(s=>s.connected),get=useSports(s=>s.get);
   useEffect(()=>{if(!connected||!globalThis.chrome?.runtime?.id)return;void get();const change=(changes:Record<string,unknown>)=>{if(changes.gamedeckSports||Object.values(SCORE_CACHE_KEYS).some(key=>changes[key]))void get();};chrome.storage.onChanged.addListener(change);return()=>chrome.storage.onChanged.removeListener(change);},[connected,get]);return null;
 }
 export function StreamingServices(){
-  const {view,command,busy}=useSports();const {connected,send}=useDeck();
+  const {view,command}=useSports();const {connected,send}=useDeck();
   const [choices,setChoices]=useState<{serviceId:string;tabs:NonNullable<LaunchResult['choices']>}|null>(null),[tab,setTab]=useState<number|null>(null);
   return <section className="stream-services" aria-label="Streaming Services"><div><span className="section-kicker">YOUR EXISTING CHROME PROFILE</span><h2>Streaming Services</h2></div><div className="service-buttons">{[...DEFAULT_SERVICES,...(view?.settings.services||[])].map(service=><button key={service.id} className="service-launch" disabled={!connected} onClick={async()=>{const result:LaunchResult|null=await command({type:'SPORTS_LAUNCH_SERVICE',id:service.id});if(result?.choices)setChoices({serviceId:service.id,tabs:result.choices});else setTab(result?.focused||result?.opened||null);}}><span className={`service-symbol ${service.id}`}>{service.id==='disney'?'D+':service.id==='dazn'?'DAZN':service.name.slice(0,2)}</span><span>{service.name}</span><ArrowUpRight size={13}/></button>)}</div>{tab&&<button className="button secondary small" onClick={()=>void send({type:'ADD_TAB',tabId:tab})}><Plus size={13}/>Add launched tab to GameDeck</button>}
     {choices&&<div className="modal-backdrop"><section role="dialog" aria-modal="true" aria-label="Select streaming tab" className="modal"><div className="modal-heading"><h2>Select an existing stream</h2><button className="icon-button" aria-label="Close service picker" onClick={()=>setChoices(null)}><X size={17}/></button></div><p>These tabs are already open. Their pages will not be navigated.</p>{choices.tabs.map(t=><div className="service-tab" key={t.id}><span>{t.title}</span><button className="button secondary small" onClick={()=>void command({type:'SPORTS_FOCUS_TAB',tabId:t.id})}>Focus</button><button className="button secondary small" onClick={async()=>{if(await send({type:'ADD_TAB',tabId:t.id}))setChoices(null);}}>Add to deck</button></div>)}<button className="text-button" onClick={async()=>{await command({type:'SPORTS_LAUNCH_SERVICE',id:choices.serviceId,openHome:true});setChoices(null);}}>Open a separate service homepage <ArrowUpRight size={13}/></button></section></div>}

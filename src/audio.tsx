@@ -25,7 +25,7 @@ function GameVolume({gameKey,title,volume,available}:{gameKey:string;title:strin
 }
 
 export function GameAudio({gameKey}:{gameKey:string}) {
-  const {view,busy,send}=useDeck();
+  const {view,send}=useDeck();
   const binding=view?.runtime.bindings[gameKey];
   const tab=view?.tabs.find(t=>t.id===binding?.tabId);
   const game=view?.deck.games.find(g=>g.key===gameKey);

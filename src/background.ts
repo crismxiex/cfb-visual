@@ -20,9 +20,8 @@ chrome.action.onClicked.addListener(async()=>{
   else await chrome.windows.create({url,type:'popup',width:1280,height:900});
 });
 chrome.runtime.onStartup.addListener(()=>safe('STARTUP'));
-chrome.runtime.onStartup.addListener(()=>void sports.startup().catch(console.error));
-chrome.runtime.onInstalled.addListener(()=>void sports.startup().catch(console.error));
 chrome.alarms.onAlarm.addListener(alarm=>{if(alarm.name===SCORE_ALARM)void sports.refresh().catch(console.error);});
+// Runs on every worker start, which already covers browser startup and install.
 void sports.startup().catch(console.error);
 const checkDashboardClosed=async()=>{
   try{const tabs=await chrome.tabs.query({});if(!tabs.some(t=>{if(!t.url?.startsWith(chrome.runtime.getURL('dashboard.html')))return false;return new URL(t.url).searchParams.get('view')!=='ticker';}))await controller.request({type:'DASHBOARD_CLOSED'});}catch(error){console.error(error);}
