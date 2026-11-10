@@ -59,7 +59,10 @@ async function connectPlayers(granted=true){
   const request=vi.fn(async()=>granted);
   vi.stubGlobal('chrome',{permissions:{request},storage:{onChanged:event},tabs:{onUpdated:event,onRemoved:event},system:{display:{onDisplayChanged:event}}});
   const view=structuredClone(useDeck.getState().view!);
-  view.tabs.forEach((t,i)=>t.url=i===1?'https://www.disneyplus.com/watch/2':'https://www.dazn.com/watch/'+i);
+  view.tabs[0].url='https://www.dazn.com/watch/1';
+  view.tabs[1].url='https://www.disneyplus.com/watch/2';
+  view.tabs[2].url='https://tv.youtube.com/watch/game';
+  view.tabs[3].url='https://www.youtube.com/watch?v=example';
   await act(async()=>useDeck.setState({view,connected:true}));return request;
 }
 it('reloads a game from the lineup without selecting it for audio',async()=>{
@@ -71,7 +74,7 @@ it('reloads a game from the lineup without selecting it for audio',async()=>{
 });
 it('Clean player view requests only the selected provider origins before sending its command',async()=>{
   const request=await connectPlayers();const button=[...container.querySelectorAll('button')].find(b=>b.textContent==='Clean player view')!;
-  await act(async()=>button.click());expect(request).toHaveBeenCalledExactlyOnceWith({permissions:['scripting'],origins:['https://www.dazn.com/*','https://www.disneyplus.com/*']});expect(send).toHaveBeenCalledWith({type:'PLAYER_VIEW',enabled:true,fit:'contain'});
+  await act(async()=>button.click());expect(request).toHaveBeenCalledExactlyOnceWith({permissions:['scripting'],origins:['https://www.dazn.com/*','https://www.disneyplus.com/*','https://tv.youtube.com/*']});expect(send).toHaveBeenCalledWith({type:'PLAYER_VIEW',enabled:true,fit:'contain'});
 });
 it('denied player-view permission leaves the playing tabs untouched',async()=>{
   await connectPlayers(false);const button=[...container.querySelectorAll('button')].find(b=>b.textContent==='Clean player view')!;await act(async()=>button.click());expect(send).not.toHaveBeenCalled();expect(container.textContent).toContain('Your players are unchanged.');
@@ -81,7 +84,7 @@ it('Restore page controls needs no new permission request',async()=>{
 });
 it('volume access requests only managed provider origins and refreshes the original players',async()=>{
   const request=await connectPlayers();await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Enable volume controls')!.click());
-  expect(request).toHaveBeenCalledExactlyOnceWith({permissions:['scripting'],origins:['https://www.dazn.com/*','https://www.disneyplus.com/*']});expect(send).toHaveBeenCalledExactlyOnceWith({type:'AUDIO_STATUS'});
+  expect(request).toHaveBeenCalledExactlyOnceWith({permissions:['scripting'],origins:['https://www.dazn.com/*','https://www.disneyplus.com/*','https://tv.youtube.com/*']});expect(send).toHaveBeenCalledExactlyOnceWith({type:'AUDIO_STATUS'});
 });
 it('denied volume access leaves players unchanged and explains that tab mute remains available',async()=>{
   await connectPlayers(false);await act(async()=>[...container.querySelectorAll('button')].find(b=>b.textContent==='Enable volume controls')!.click());expect(send).not.toHaveBeenCalled();expect(container.textContent).toContain('Chrome tab mute controls are still available');
@@ -128,8 +131,8 @@ it('selects NFL from the Sports Hub and shows its scores without college filters
   expect(container.querySelector('[aria-label="Conference filter"]')).toBeNull();
   expect(container.textContent).not.toContain('Top 25');
 });
-it('only Disney+ and DAZN appear as default streaming-service destinations',()=>{
-  const services=container.querySelector('[aria-label="Streaming Services"]')!;expect(services.textContent).toContain('Disney+ Mexico');expect(services.textContent).toContain('DAZN Mexico');expect(services.textContent).not.toContain('ESPN');
+it('shows YouTube TV alongside the Mexico streaming shortcuts',()=>{
+  const services=container.querySelector('[aria-label="Streaming Services"]')!;expect(services.textContent).toContain('Disney+ Mexico');expect(services.textContent).toContain('DAZN Mexico');expect(services.textContent).toContain('YouTube TV');expect(services.textContent).not.toContain('ESPN');
 });
 it('a linked scoreboard card reuses the existing audio selection command',async()=>{
   await scores();await act(async()=>container.querySelector<HTMLElement>('.score-card')!.click());expect(send).toHaveBeenCalledExactlyOnceWith({type:'SELECT',key:'g3'});

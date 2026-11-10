@@ -155,7 +155,25 @@ describe('browser ticker without a native helper',()=>{
   });
 });
 describe('Mexico streaming launchers and manual matching',()=>{
-  it('only provides Disney+ and DAZN defaults and rejects ESPN shortcuts',()=>{expect(DEFAULT_SERVICES.map(s=>s.id)).toEqual(['disney','dazn']);expect(()=>customService('ESPN','https://espn.com/watch')).toThrow();});
+  it('provides Disney+, DAZN, and YouTube TV defaults and rejects ESPN shortcuts',()=>{expect(DEFAULT_SERVICES.map(s=>s.id)).toEqual(['disney','dazn','youtube-tv']);expect(()=>customService('ESPN','https://espn.com/watch')).toThrow();});
+  it('opens YouTube TV without reusing a regular YouTube tab, then focuses an existing stream',async()=>{
+    const tabs=[{id:7,url:'https://www.youtube.com/watch?v=example'}];
+    const create=vi.fn(async()=>({id:8}));
+    const update=vi.fn(async()=>({}));
+    const api={
+      windows:{getAll:async()=>[{id:1,type:'normal',tabs}],update:vi.fn()},
+      tabs:{get:async()=>({id:8,windowId:1}),update,create},
+    } as unknown as typeof chrome;
+    const launcher=createStreamingLauncher(api);
+    const service=DEFAULT_SERVICES.find(s=>s.id==='youtube-tv')!;
+    await expect(launcher.launch(service)).resolves.toEqual({opened:8});
+    expect(create).toHaveBeenCalledExactlyOnceWith({windowId:1,url:'https://tv.youtube.com/',active:true});
+    expect(update).not.toHaveBeenCalled();
+    tabs.push({id:8,url:'https://tv.youtube.com/watch/game'});
+    await expect(launcher.launch(service)).resolves.toEqual({focused:8});
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledExactlyOnceWith(8,{active:true});
+  });
   it('focuses an existing stream without navigating it',async()=>{const update=vi.fn(async()=>({}));const create=vi.fn();const api:any={windows:{getAll:async()=>[{id:1,type:'popup',tabs:[{id:7,url:'https://www.dazn.com/watch/game',title:'Game'}]}],update},tabs:{get:async()=>({id:7,windowId:1}),update,create}};await createStreamingLauncher(api).launch(DEFAULT_SERVICES[1]);expect(create).not.toHaveBeenCalled();expect(update.mock.calls.some(c=>'url'in c[1])).toBe(false);});
   it('offers a choice when several game tabs belong to the same service',async()=>{const api:any={windows:{getAll:async()=>[{type:'popup',tabs:[{id:1,url:'https://www.dazn.com/a'},{id:2,url:'https://www.dazn.com/b'}]}]}};const result=await createStreamingLauncher(api).launch(DEFAULT_SERVICES[1]);expect(result.choices).toHaveLength(2);});
   it('requires both teams for a match and always returns suggestions for confirmation',()=>{const events=batch().events;expect(suggestEvents({title:'#3 Oregon @ #2 Ohio State | DAZN',url:'https://dazn.com/a'},events,'2026-11-07')[0].confidence).toBeGreaterThan(.9);expect(suggestEvents({title:'Oregon Ducks',url:'https://dazn.com/a'},events)).toEqual([]);});

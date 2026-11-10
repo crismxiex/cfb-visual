@@ -54,7 +54,7 @@ export function AudioBar() {
   async function enableVolume(){
     const current=useDeck.getState().view;
     const origins=[...new Set(Object.values(current?.runtime.bindings||{}).map(b=>playerOrigin(current?.tabs.find(t=>t.id===b.tabId)?.url||'')).filter((o):o is string=>!!o))];
-    if(!origins.length){setNotice('Player volume supports Disney+, DAZN and ESPN. Other tabs still have Chrome mute controls.');return;}
+    if(!origins.length){setNotice('Player volume supports Disney+, DAZN, ESPN, and YouTube TV. Other tabs still have Chrome mute controls.');return;}
     try {
       const granted=await chrome.permissions.request({permissions:['scripting'],origins});
       if(!granted){setNotice('Page access was not granted. Chrome tab mute controls are still available.');return;}

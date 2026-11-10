@@ -1,8 +1,15 @@
 import { setCleanPlayerView } from './clean-player';
+import { playerProvider } from './model';
 import type { Deck, Runtime } from './model';
 
 export function playerOrigin(raw: string): string | null {
-  try { const url=new URL(raw);return url.protocol==='https:'&&/(^|\.)(disneyplus|dazn|espn)\.com$/.test(url.hostname)?`${url.origin}/*`:null; } catch {return null;}
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' || !playerProvider(url.hostname)) return null;
+    return `${url.origin}/*`;
+  } catch {
+    return null;
+  }
 }
 export function createPlayerViewController(api: typeof chrome, getDeck:()=>Deck, getRuntime:()=>Runtime) {
   async function set(enabled:boolean,fit:Deck['playerFit'],keys?:string[],updateOnly=false) {
@@ -14,7 +21,7 @@ export function createPlayerViewController(api: typeof chrome, getDeck:()=>Deck,
       const binding=runtime.bindings[game.key];if(!binding)continue;
       try{
         const tab=await api.tabs.get(binding.tabId),origin=playerOrigin(tab.url||'');
-        if(!origin){if(enabled)details.push(`${game.title}: clean view supports Disney+, DAZN and ESPN.`);continue;}
+        if(!origin){if(enabled)details.push(`${game.title}: clean view supports Disney+, DAZN, ESPN, and YouTube TV.`);continue;}
         available++;
         if(!api.permissions||!api.scripting||!await api.permissions.contains({permissions:['scripting'],origins:[origin]})){
           details.push(`${game.title}: allow optional page access using Clean player view.`);continue;

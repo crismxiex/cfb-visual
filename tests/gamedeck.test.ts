@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { calculateLayout, layouts } from '../src/layout';
 import { durableUrl, emptyDeck, normalizeUrl, provider, reconcile } from '../src/model';
 import { createController } from '../src/controller';
@@ -48,16 +48,23 @@ describe('Command Center player volume',()=>{
     for(const id of [1,2])f.tabs.get(id).url='https://www.dazn.com/watch/'+id;
     return states;
   }
-  it('reads Disney+ player volume without an undefined script argument',async()=>{
+  it.each([
+    ['Disney+','https://www.disneyplus.com/watch/game'],
+    ['YouTube TV','https://tv.youtube.com/watch/game'],
+  ])('reads %s player volume without an undefined script argument',async(name,url)=>{
     const f=fixture();
     const media=players(f);
-    f.tabs.get(1).url='https://www.disneyplus.com/watch/game';
+    f.tabs.get(1).url=url;
+    const contains=vi.fn(async()=>true);
+    f.api.permissions.contains=contains;
     const added=await f.add(1);
     const key=added.deck.games[0].key;
     media.get(1)!.muted=true;
     const result=await f.controller.request({type:'AUDIO_STATUS'});
     expect(result.runtime.bindings[key].playerAudio).toMatchObject({available:true,volume:.25,muted:true});
     expect(f.calls).toContainEqual(['player',1,'read']);
+    expect(contains).toHaveBeenCalledWith({permissions:['scripting'],origins:[new URL(url).origin+'/*']});
+    expect(provider(url)).toBe(name);
     expect(media.get(1)?.muted).toBe(true);
   });
   it('unmutes the chosen player before its tab, after muting other games, without moving windows',async()=>{

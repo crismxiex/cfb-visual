@@ -1,6 +1,10 @@
-import {durableUrl,normalizeUrl} from '../model';
+import {durableUrl,normalizeUrl,YOUTUBE_TV_HOST} from '../model';
 import type {StreamShortcut} from './types';
-export const DEFAULT_SERVICES:StreamShortcut[]=[{id:'disney',name:'Disney+ Mexico',url:'https://www.disneyplus.com/',domain:'disneyplus.com'},{id:'dazn',name:'DAZN Mexico',url:'https://www.dazn.com/',domain:'dazn.com'}];
+export const DEFAULT_SERVICES:StreamShortcut[]=[
+  {id:'disney',name:'Disney+ Mexico',url:'https://www.disneyplus.com/',domain:'disneyplus.com'},
+  {id:'dazn',name:'DAZN Mexico',url:'https://www.dazn.com/',domain:'dazn.com'},
+  {id:'youtube-tv',name:'YouTube TV',url:`https://${YOUTUBE_TV_HOST}/`,domain:YOUTUBE_TV_HOST},
+];
 export function customService(name:string,raw:string):StreamShortcut{
   const url=durableUrl(normalizeUrl(raw)),domain=new URL(url).hostname.replace(/^www\./,'');
   if(/(^|\.)(espn|espnplus|watchespn)\.com$/.test(domain)||/^espn/i.test(name.trim()))throw new Error('ESPN is a data source, not a streaming shortcut for Mexico.');

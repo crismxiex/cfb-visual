@@ -8,6 +8,7 @@ import { useDeck } from './store';
 import './style.css';
 import { AudioBar, GameAudio, TileAudioStatus } from './audio';
 import { PlayerTools } from './player-controls';
+import { playerOrigin } from './player-view-controller';
 import {LinkedScore,Scoreboard,SportsBootstrap,SportsPreferences,StreamingServices} from './sports/ui';
 
 function MiniLayout({id,custom}:{id:LayoutId;custom?:{columns:number;rows:number}}){
@@ -33,7 +34,9 @@ export function App(){
   const area=display?displayArea(display,deck.displayMode,runtime.scoreOverlay):{left:0,top:0,width:1600,height:1000};
   let slots:Rect[]=[];let geometryError='';try{slots=calculateLayout(area,deck.layout,deck.gap,deck.custom);}catch(e){geometryError=String(e);}
   const position=(r:Rect)=>({left:`${(r.left-area.left)/area.width*100}%`,top:`${(r.top-area.top)/area.height*100}%`,width:`${r.width/area.width*100}%`,height:`${r.height/area.height*100}%`});
-  const tabs=(view?.tabs||[]).filter(t=>!Object.values(runtime.bindings).some(b=>b.tabId===t.id) && `${t.title} ${t.url}`.toLowerCase().includes(search.toLowerCase())).sort((a,b)=>Number(['Disney+','DAZN'].includes(provider(b.url||'')))-Number(['Disney+','ESPN','DAZN'].includes(provider(a.url||''))));
+  const tabs=(view?.tabs||[])
+    .filter(t=>!Object.values(runtime.bindings).some(b=>b.tabId===t.id) && `${t.title} ${t.url}`.toLowerCase().includes(search.toLowerCase()))
+    .sort((a,b)=>Number(!!playerOrigin(b.url||''))-Number(!!playerOrigin(a.url||'')));
   const active=deck.games.filter(g=>runtime.bindings[g.key]).length;
   async function addUrl(e:React.FormEvent){e.preventDefault();if(await send({type:'ADD_URL',url}))setUrl('');}
   const action=(type:string,key?:string)=>void send({type,key});
@@ -43,7 +46,7 @@ export function App(){
       <a className="brand" href="#" onClick={()=>setSection('Workspace')}><span className="brand-mark"><i/><i/><i/></span>GameDeck<span className="beta">LOCAL</span></a>
       <div className="sidebar-label">GAME DAY CONTROL</div>
       <nav>{[{name:'Workspace',icon:LayoutDashboard},{name:'Sports Hub',icon:Monitor},{name:'Saved layouts',icon:Save},{name:'Preferences',icon:Settings2}].map(({name,icon:Icon})=><button key={name} className={section===name?'nav-item active':'nav-item'} onClick={()=>setSection(name)}><Icon size={18}/>{name}{name==='Workspace'&&<span className="nav-count">{deck.games.length}</span>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="privacy-icon"><ShieldCheck size={20}/></div><strong>Your streams stay yours.</strong><p>Real Chrome windows.<br/>Your profile. Your sessions.</p><button className="help-link" onClick={()=>setSection('How it works')}><CircleHelp size={15}/>How GameDeck works<ArrowUpRight size={14}/></button><div className="version">GAMEDECK <span>v2.5.1</span></div></div>
+      <div className="sidebar-bottom"><div className="privacy-icon"><ShieldCheck size={20}/></div><strong>Your streams stay yours.</strong><p>Real Chrome windows.<br/>Your profile. Your sessions.</p><button className="help-link" onClick={()=>setSection('How it works')}><CircleHelp size={15}/>How GameDeck works<ArrowUpRight size={14}/></button><div className="version">GAMEDECK <span>v2.5.2</span></div></div>
     </aside>
     <div className="body"><header className="topbar"><div className="breadcrumb">GameDeck <ChevronRight size={14}/><span>{section}</span></div><div className="connection"><span className={connected?'status-dot':'status-dot offline'}/>{connected?'Chrome connected':'Extension preview'}<span className="divider"/><ShieldCheck size={14}/>On your device</div></header>
     <main>
@@ -54,7 +57,7 @@ export function App(){
       {section==='Sports Hub'&&<><StreamingServices/><Scoreboard/></>}
       {section==='Workspace'&&<>
         <StreamingServices/><Scoreboard compact/>
-        <form className="url-form" onSubmit={addUrl}><div className="link-icon"><ExternalLink size={19}/></div><input aria-label="Game URL" value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a game URL..." required/><span className="url-hint">Disney+ · DAZN · any HTTPS site</span><button className="button primary" disabled={busy||!url.trim()}><Plus size={16}/>Add game</button></form>
+        <form className="url-form" onSubmit={addUrl}><div className="link-icon"><ExternalLink size={19}/></div><input aria-label="Game URL" value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste a game URL..." required/><span className="url-hint">Disney+ · DAZN · YouTube TV · any HTTPS site</span><button className="button primary" disabled={busy||!url.trim()}><Plus size={16}/>Add game</button></form>
         <PlayerTools/>{runtime.layoutNotice&&<div className="notice" role="status">{runtime.layoutNotice}</div>}<div className="workspace-grid"><section className="arrangement panel"><div className="panel-heading"><div><span className="section-kicker">THE BIG PICTURE</span><h2>Window arrangement <span className="badge">{deck.games.length} / {slots.length} slots</span></h2></div><button className="icon-button" title="Apply arrangement" disabled={busy} onClick={()=>action('APPLY')}><RefreshCw size={16} className={busy?'spin':''}/></button></div>
           <div className="monitor-toolbar"><Monitor size={16}/><select aria-label="Viewing monitor" value={deck.displayId} onChange={e=>void send({type:'DISPLAY',displayId:e.target.value})} disabled={busy||!connected}>{view?.displays.length?view.displays.map(d=><option key={d.id} value={d.id}>{d.name||'Monitor'}{d.isPrimary?' · Primary':''} · {d.workArea.width} × {d.workArea.height}</option>):<option>Select viewing monitor</option>}</select><span className="resolution">{display?(deck.displayMode==='full'?'FULL DISPLAY':'WORK AREA'):'NO DISPLAY CONNECTED'}</span></div>
           <div className="monitor-frame"><div className="monitor-top"><span/><span/><span/><p>LAYOUT MAP <span>·</span> {layouts.find(l=>l.id===deck.layout)?.name.toUpperCase()}</p></div><div className="layout-canvas" style={{aspectRatio:`${Math.min(2.3,Math.max(1.15,area.width/area.height))}`}}>

@@ -46,7 +46,7 @@ HTTP previews explicitly display **Extension preview** and cannot manage tabs. T
 ## Features
 
 - Paste HTTPS URLs with validation, normalization, existing-tab reuse, duplicate prevention, first-free-slot assignment, and immediate layout application.
-- Search existing normal/popup website tabs, including Disney+, ESPN, DAZN, and other HTTPS sites.
+- Search existing normal/popup website tabs, including Disney+, ESPN, DAZN, YouTube TV, and other HTTPS sites.
 - Drag to swap occupied positions or move into an empty slot. The swap button also lets you click a destination in the layout map.
 - Promote any game to slot 1, focus its window, minimize or restore it, or reload its tab from the lineup.
 - Edit your own game titles, teams, and scores. Nothing is scraped from protected content. **Connected** means the tab exists, not that playback was verified.
@@ -58,7 +58,7 @@ Choose from built-in grids, side-by-side views, and layouts that give the main g
 
 ## Clean player view (v2.3)
 
-Start each provider's player, then click **Clean player view** above the layout map. GameDeck asks for optional scripting access and only the specific managed Disney+, DAZN and ESPN origins selected for this action. Normal URL insertion, window layouts and audio work without this access. Other HTTPS sites can still be managed as windows but are not styled by this feature.
+Start each provider's player, then click **Clean player view** above the layout map. GameDeck asks for optional scripting access to the managed Disney+, DAZN, ESPN, and YouTube TV origins selected for this action. Normal URL insertion, window layouts and audio work without this access. Other HTTPS sites can still be managed as windows but are not styled by this feature.
 
 The feature ports Saturday's player-only presentation: the original playing video stays in its original document and is positioned over the website interface to fill the window's content area. Its source, playback state, audio and authentication are untouched. It does not create a player, iframe or video copy, capture pixels, use exclusive fullscreen, or remove Chrome title bars. Open shadow roots and existing same-origin player frames are supported; inaccessible cross-origin players may require the provider's own theater view.
 
@@ -78,7 +78,7 @@ All audio requests run through a serialized controller. It validates the target,
 
 Manual Chrome mute events are observed. Muting the active game enters silence without repeatedly unmuting it. Manually unmuting another managed tab designates it and mutes the others. Events from this extension are recognized and ignored, preventing feedback loops. Turning **Manage audio** off, removing a game or returning its tab restores the earlier tab mute setting only when the current state is still owned by GameDeck; newer manual choices and other extensions' choices are preserved. Unmanaged tabs are never muted.
 
-Click **Enable volume controls** in the Command Center to allow optional page access for your managed Disney+, DAZN and ESPN origins. Each game then has a 0–100% player volume slider. **Listen**, tile selection and follow-main switching also unmute the original player, including recovering from zero volume at the last audible level (50% if none is known). Sliders remember each game's chosen level and do not select or reposition another window. Other managed games stay muted through Chrome's tab controls. **Mute all** keeps every managed tab silent until you choose one again.
+Click **Enable volume controls** in the Command Center to allow optional page access for your managed Disney+, DAZN, ESPN, and YouTube TV origins. Each detected player then has a 0–100% volume slider. **Listen**, tile selection and follow-main switching also unmute the original player, including recovering from zero volume at the last audible level (50% if none is known). Sliders remember each game's chosen level and do not select or reposition another window. Other managed games stay muted through Chrome's tab controls. **Mute all** keeps every managed tab silent until you choose one again.
 
 Player audio status refreshes every five seconds while the dashboard is visible; **Refresh audio** updates it immediately. Start playback first. Same-origin frames and open shadow roots are supported; inaccessible player frames show an unavailable status while ordinary Chrome mute controls keep working. No audio capture, playback restart or native helper is required. These controls change the original player's volume, not the Windows master or Chrome application mixer volume.
 

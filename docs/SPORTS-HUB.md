@@ -2,11 +2,13 @@
 
 The existing React dashboard, Chrome window controller, clean player presentation, layout engine and exclusive audio manager remain in place. Sports Hub is an additional data and linking layer, not a new browser, backend, embedded streaming player or audio manager.
 
-## Using the hub in Mexico
+## Using the hub
 
-Reload GameDeck at `chrome://extensions` after rebuilding. Chrome 120+ is required for the 30-second alarm cadence. The default **Streaming Services** buttons are **Disney+ Mexico** and **DAZN Mexico**, opening the exact root URLs requested. ESPN is never a streaming shortcut; its scoreboard attribution link is informational.
+Reload GameDeck at `chrome://extensions` after rebuilding. Chrome 120+ is required for the 30-second alarm cadence. The **Streaming Services** shortcuts include **Disney+ Mexico**, **DAZN Mexico**, and **YouTube TV** for U.S. viewers. ESPN supplies scoreboard data and attribution.
 
 A launcher first looks for an existing service homepage, then for existing playing tabs. It focuses a single suitable tab or offers a selection when multiple streams exist. It never navigates an existing stream to the homepage. If no tab exists, it opens a normal Chrome tab/window in the same profile. **Add launched tab to GameDeck** and the existing tab picker use the current tab ID and the existing automatic layout growth.
+
+For YouTube TV, open a game at `tv.youtube.com` in your signed-in profile and add the playing tab to GameDeck. **Enable volume controls** and **Clean player view** request optional access to the YouTube TV host when you use them. YouTube TV handles sign-in, subscriptions, and location.
 
 Additional HTTPS service shortcuts can be saved in Preferences. Credentials in URLs are rejected and recognized token fields are removed before persistence. ESPN/ESPN+/WatchESPN shortcuts are rejected.
 
@@ -98,7 +100,7 @@ The helper source compiles in this environment. Windows returned **Access is den
 | `src/sports/service.ts` | Durable alarm scheduling, cache/backoff/deduplication, links and preferences |
 | `src/sports/matcher.ts` | Confidence-scored suggestions requiring confirmation |
 | `src/sports/alerts.ts` | Snapshot-difference alerts and suppression |
-| `src/sports/services.ts` | Mexico launchers and custom shortcut validation |
+| `src/sports/services.ts` | Streaming launchers and custom shortcut validation |
 | `src/sports/store.ts`, `ui.tsx`, `style.css` | Integrated score UI and state |
 | `src/native.ts`, `native/ScoreOverlay.cs` | Optional native ticker transport/presentation |
 

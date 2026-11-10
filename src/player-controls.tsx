@@ -12,7 +12,7 @@ export function PlayerTools(){
     const current=useDeck.getState().view;
     const targets=Object.entries(current?.runtime.bindings||{}).filter(([key])=>!keys||keys.includes(key));
     const origins=[...new Set(targets.map(([,b])=>playerOrigin(current?.tabs.find(t=>t.id===b.tabId)?.url||'')).filter((origin):origin is string=>!!origin))];
-    if(!origins.length){setNotice('Clean player view currently supports Disney+, DAZN and ESPN tabs.');return;}
+    if(!origins.length){setNotice('Clean player view supports Disney+, DAZN, ESPN, and YouTube TV tabs.');return;}
     try{
       // Invoked directly by a user gesture; request only selected provider origins.
       const granted=await chrome.permissions.request({permissions:['scripting'],origins});

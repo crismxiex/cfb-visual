@@ -5,7 +5,7 @@ it('GameDeck requests only metadata, persistence and display permissions',async(
   expect(manifest.manifest_version).toBe(3);expect(manifest.permissions).toEqual(['tabs','storage','system.display','alarms']);
   expect(manifest.host_permissions).toBeUndefined();expect(manifest.content_scripts).toBeUndefined();
   expect(manifest.optional_permissions).toEqual(['nativeMessaging','scripting']);
-  expect(manifest.optional_host_permissions).toEqual(['https://*.disneyplus.com/*','https://*.dazn.com/*','https://*.espn.com/*','https://site.api.espn.com/*']);
+  expect(manifest.optional_host_permissions).toEqual(['https://*.disneyplus.com/*','https://*.dazn.com/*','https://*.espn.com/*','https://site.api.espn.com/*','https://tv.youtube.com/*']);
   expect(Object.values(manifest.commands).filter((v:any)=>v.suggested_key)).toHaveLength(4);
 });
 it('GameDeck has no capture, iframe, cookie or remote-debugging implementation',async()=>{

@@ -34,9 +34,16 @@ export function durableUrl(raw: string): string {
   if (/token|auth|password|secret|jwt/i.test(url.hash)) url.hash = '';
   return url.href;
 }
+export const YOUTUBE_TV_HOST = 'tv.youtube.com';
+export function playerProvider(hostname: string) {
+  if (hostname === YOUTUBE_TV_HOST) return 'YouTube TV';
+  if (/(^|\.)disneyplus\.com$/.test(hostname)) return 'Disney+';
+  if (/(^|\.)espn\.com$/.test(hostname)) return 'ESPN';
+  if (/(^|\.)dazn\.com$/.test(hostname)) return 'DAZN';
+}
 export function provider(raw: string): string {
-  let host: string; try { host = new URL(raw).hostname.replace(/^www\./, ''); } catch { return 'Website'; }
-  return /(^|\.)disneyplus\.com$/.test(host) ? 'Disney+' : /(^|\.)espn\.com$/.test(host) ? 'ESPN' : /(^|\.)dazn\.com$/.test(host) ? 'DAZN' : host;
+  let host: string; try { host = new URL(raw).hostname; } catch { return 'Website'; }
+  return playerProvider(host) ?? host.replace(/^www\./, '');
 }
 export function reconcile(games: Game[], tabs: chrome.tabs.Tab[], windows: chrome.windows.Window[], bindings: Record<string, Binding>): Record<string, Binding> {
   const result: Record<string, Binding> = {};

@@ -11,7 +11,7 @@ export function createAudioController(api: typeof chrome, getDeck:()=>Deck, getR
     const binding=getRuntime().bindings[key];if(!binding)throw new Error('This game is unavailable.');
     try {
       const tab=await api.tabs.get(binding.tabId),origin=playerOrigin(tab.url||'');
-      if(!origin){binding.playerAudio={available:false,status:'Player volume supports Disney+, DAZN and ESPN.'};return false;}
+      if(!origin){binding.playerAudio={available:false,status:'Player volume supports Disney+, DAZN, ESPN, and YouTube TV.'};return false;}
       if(!api.permissions||!api.scripting||!await api.permissions.contains({permissions:['scripting'],origins:[origin]})){
         binding.playerAudio={available:false,status:'Enable volume controls to adjust and unmute the player.'};return false;
       }
