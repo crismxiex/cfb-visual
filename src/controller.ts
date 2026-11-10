@@ -3,7 +3,7 @@ import { createNativeManager } from './native';
 import { calculateLayout, layoutForAddition, layouts } from './layout';
 import { createPlayerViewController } from './player-view-controller';
 import type {OverlaySettings,ScoreEvent} from './sports/types';
-import {scoreText} from './sports/types';
+import {mexicoTime,scoreText} from './sports/types';
 import { displayArea, mainGameKey, durableUrl, emptyDeck, emptyRuntime, normalizeUrl, provider, reconcile } from './model';
 import type { Binding, Command, Deck, Display, LayoutId, Runtime, Snapshot, View } from './model';
 
@@ -248,7 +248,7 @@ export function createController(api: typeof chrome) {
           try{
             if(!runtime.arranged)await apply();
             const b=runtime.bindings[anchor.key];await native.connect(true);await native.ensurePair(anchor.key,b.tabId,b.windowId,display.bounds);
-            const lines=(message.events as ScoreEvent[]||[]).slice(0,30).map(e=>`${e.away.abbreviation} ${scoreText(e.away)} — ${e.home.abbreviation} ${scoreText(e.home)}\n${e.status==='scheduled'?new Intl.DateTimeFormat('en-US',{timeZone:'America/Mexico_City',hour:'numeric',minute:'2-digit'}).format(new Date(e.date))+' MX':e.status==='final'?'Final':e.statusText}`);
+            const lines=(message.events as ScoreEvent[]||[]).slice(0,30).map(e=>`${e.away.abbreviation} ${scoreText(e.away)} — ${e.home.abbreviation} ${scoreText(e.home)}\n${e.status==='scheduled'?mexicoTime(e.date)+' MX':e.status==='final'?'Final':e.statusText}`);
             await native.overlay({enabled:true,anchorKey:anchor.key,settings:{...options,height:reservation.height},monitor:display.bounds,area:displayArea(display,deck.displayMode),lines,freshness:String(message.freshness||'')});
             const previous=runtime.scoreOverlay;runtime.scoreOverlay=reservation;
             if((previous?.reserve||reservation.reserve)&&JSON.stringify(previous)!==JSON.stringify(reservation))await apply();
@@ -289,8 +289,13 @@ export function createController(api: typeof chrome) {
         const games=deck.games.filter(g=>runtime.bindings[g.key]);
         if(games.length) await focus(games[(games.findIndex(g=>g.key===deck.selected)+1)%games.length].key);
       } else if(message.type==='NEXT_LAYOUT') {
-        const compatible=layouts.filter(l=>l.id!=='custom' && l.capacity>=deck.games.length);
-        remember();deck.layout=compatible[(compatible.findIndex(l=>l.id===deck.layout)+1)%compatible.length]?.id||'custom';deck.games.forEach((g,i)=>g.slot=i); await audio.mainChanged(previousMain);await apply();
+        const display=(await screens()).find(d=>d.id===deck.displayId);
+        if(!display) throw new Error('Choose a connected monitor.');
+        const area=displayArea(display,deck.displayMode,runtime.scoreOverlay);
+        // Skip presets that cannot fit this monitor so a bad layout is never persisted.
+        const compatible=layouts.filter(l=>{if(l.id==='custom'||l.capacity<deck.games.length)return false;try{calculateLayout(area,l.id,deck.gap);return true;}catch{return false;}});
+        if(!compatible.length) throw new Error('No other preset layout fits this lineup on this monitor.');
+        remember();deck.layout=compatible[(compatible.findIndex(l=>l.id===deck.layout)+1)%compatible.length].id;deck.games.forEach((g,i)=>g.slot=i); await audio.mainChanged(previousMain);await apply();
       } else if(message.type==='PREVIOUS') {
         if(!deck.previous) throw new Error('No previous arrangement yet.');
         const screen=(await screens()).find(d=>d.id===deck.previous!.displayId);

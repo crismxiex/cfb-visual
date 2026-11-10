@@ -119,6 +119,13 @@ describe('URL validation and identity',()=>{
   });
 });
 describe('real-window orchestration contract',()=>{
+  it('next layout skips presets that cannot fit the current monitor',async()=>{
+    const f=fixture();await f.add(1);await f.add(2);
+    await f.controller.request({type:'LAYOUT',layout:'two-equal'});
+    f.displays[0].workArea={left:0,top:0,width:600,height:400};
+    const next=await f.controller.request({type:'NEXT_LAYOUT'});
+    expect(next.deck.layout).toBe('three-horizontal');
+  });
   it('reloads the requested tab in place and keeps the lineup and audio selection',async()=>{
     const f=fixture();
     await f.add(1);

@@ -11,12 +11,10 @@ export function createNativeManager(api:typeof chrome,onDisconnected:(reason:str
   async function connect(requireOverlay=false){
     if(port){if(requireOverlay&&!supportsOverlay)throw new Error('Update the native helper to v2.4 using native/install.ps1 to use the score ticker.');return;}
     if(!await api.permissions.contains({permissions:['nativeMessaging']}))throw new Error('Allow the optional nativeMessaging permission, then install the helper using native/install.ps1.');
-    port=api.runtime.connectNative(NATIVE_HOST);
-    port.onMessage.addListener(message=>{const entry=pending.get(message.id);if(!entry)return;clearTimeout(entry.timer);pending.delete(message.id);if(message.ok)entry.resolve(message.data);else entry.reject(new Error(message.error||'Native window operation failed.'));});
-    port.onDisconnect.addListener(()=>{
-      const reason=api.runtime.lastError?.message||'Native helper disconnected; its saved window styles and geometry are restored on disconnect.';
-      for(const entry of pending.values()){clearTimeout(entry.timer);entry.reject(new Error(reason));}pending.clear();paired.clear();overlayVisible=false;port=undefined;onDisconnected(reason);
-    });
+    const connected=api.runtime.connectNative(NATIVE_HOST);
+    port=connected;
+    connected.onMessage.addListener(message=>{const entry=pending.get(message.id);if(!entry)return;clearTimeout(entry.timer);pending.delete(message.id);if(message.ok)entry.resolve(message.data);else entry.reject(new Error(message.error||'Native window operation failed.'));});
+    connected.onDisconnect.addListener(()=>teardown(connected,api.runtime.lastError?.message||'Native helper disconnected; its saved window styles and geometry are restored on disconnect.'));
     let capabilities;
     try{capabilities=await request('hello',{});}catch(error){
       const detail=error instanceof Error?error.message:String(error);
@@ -25,11 +23,24 @@ export function createNativeManager(api:typeof chrome,onDisconnected:(reason:str
     supportsOverlay=!!capabilities?.overlay;
     if(requireOverlay&&!supportsOverlay)throw new Error('Update the native helper to v2.4 using native/install.ps1 to use the score ticker.');
   }
+  // Drops all state tied to a port. Chrome never fires onDisconnect on the side
+  // that calls disconnect(), so locally ended ports must be torn down here too.
+  function teardown(target:chrome.runtime.Port|undefined,reason:string){
+    if(!target||port!==target)return;
+    port=undefined;
+    for(const entry of pending.values()){clearTimeout(entry.timer);entry.reject(new Error(reason));}
+    pending.clear();paired.clear();overlayVisible=false;
+    onDisconnected(reason);
+  }
   function request(action:string,data:Record<string,unknown>):Promise<any>{
     if(!port)return Promise.reject(new Error('Native helper is not connected. Install native/install.ps1 for your extension ID.'));
     const id=++serial;
     return new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Native helper timed out. Immersive mode has been stopped.'));port?.disconnect();},8000);
+      const timer=setTimeout(()=>{
+        const reason='Native helper timed out. Immersive mode has been stopped.';
+        pending.delete(id);reject(new Error(reason));
+        const stale=port;teardown(stale,reason);stale?.disconnect();
+      },8000);
       pending.set(id,{resolve,reject,timer});
       try{port!.postMessage({id,action,...data});}catch(error){clearTimeout(timer);pending.delete(id);reject(error);}
     });

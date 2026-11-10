@@ -23,6 +23,7 @@ export const defaults=():SportsSettings=>({enabled:false,league:'cfb',date:'',fi
 export const emptyCache=(league:ScoreLeague='cfb'):ScoreCache=>({events:[],date:'',updatedAt:0,attemptAt:0,nextPollAt:0,failures:0,error:'',coverageWarning:'',rankLabel:'',providerName:'ESPN · unofficial feed',attributionUrl:`https://www.espn.com/${SCORE_LEAGUES[league].path}/scoreboard`,alerts:[],overlayStatus:''});
 export const CONFERENCES:Record<string,string>={'1':'ACC','4':'Big 12','5':'Big Ten','8':'SEC','9':'Pac-12','12':'Conference USA','17':'Mountain West','18':'FBS Independents','37':'Sun Belt','151':'American'};
 export const MEXICO_TZ='America/Mexico_City';
+export const mexicoTime=(date:Date|number|string)=>new Intl.DateTimeFormat('en-US',{timeZone:MEXICO_TZ,hour:'numeric',minute:'2-digit'}).format(new Date(date));
 export const mexicoDate=(date:Date|number|string=Date.now())=>new Intl.DateTimeFormat('en-CA',{timeZone:MEXICO_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(date));
 export function validDate(value:string){return /^\d{4}-\d{2}-\d{2}$/.test(value)&&!Number.isNaN(Date.parse(value+'T12:00:00Z'))&&new Date(value+'T12:00:00Z').toISOString().slice(0,10)===value;}
 export const scoreText=(team:ScoreTeam)=>team.score===null?'—':String(team.score);

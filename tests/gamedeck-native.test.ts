@@ -12,6 +12,23 @@ function fixture(){
   return {api,calls,onDisconnect,native:createNativeManager(api,onDisconnect),rect,monitor:{left:0,top:0,width:1920,height:1080},reject(action:string){rejectAction=action;},oldHelper(){overlaySupport=false;}};
 }
 describe('optional native window bridge',()=>{
+  it('tears down a timed-out connection so the helper can reconnect',async()=>{
+    vi.useFakeTimers();
+    try{
+      // Like Chrome, disconnect() never fires onDisconnect on the calling side.
+      const ports:any[]=[];
+      const makePort=(answer:boolean)=>{const listeners:any[]=[];const port={disconnected:false,onMessage:{addListener:(fn:any)=>listeners.push(fn)},onDisconnect:{addListener:()=>{}},postMessage:(message:any)=>{if(answer)queueMicrotask(()=>listeners.forEach(fn=>fn({id:message.id,ok:true,data:{overlay:true}})));},disconnect:()=>{port.disconnected=true;}};ports.push(port);return port;};
+      let answer=false;
+      const api:any={permissions:{contains:async()=>true},runtime:{id:'test',connectNative:()=>makePort(answer)}};
+      const onDisconnect=vi.fn();const native=createNativeManager(api,onDisconnect);
+      const first=expect(native.connect()).rejects.toThrow(/timed out/);
+      await vi.advanceTimersByTimeAsync(8000);await first;
+      expect(ports[0].disconnected).toBe(true);
+      expect(onDisconnect).toHaveBeenCalledWith('Native helper timed out. Immersive mode has been stopped.');
+      answer=true;await native.connect();
+      expect(ports).toHaveLength(2);
+    }finally{vi.useRealTimers();}
+  });
   it('requires optional permission before opening a native connection',async()=>{const f=fixture();f.api.permissions.contains=async()=>false;await expect(f.native.connect()).rejects.toThrow(/nativeMessaging/);expect(f.calls).toEqual([]);});
   it('pairs through an observed Chrome geometry challenge and restores probe bounds',async()=>{
     const f=fixture();await f.native.connect();await f.native.place('game',1,10,f.monitor,f.rect);
