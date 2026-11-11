@@ -71,6 +71,12 @@ it('Escape cancels swap mode without moving any game',async()=>{
   expect(container.textContent).not.toContain('Press Esc to cancel');
   expect(send).not.toHaveBeenCalled();
 });
+it('marks only the open sidebar section as the current page',async()=>{
+  const current=()=>[...container.querySelectorAll('nav button[aria-current="page"]')].map(b=>b.getAttribute('aria-label'));
+  expect(current()).toEqual(['Workspace']);
+  await act(async()=>container.querySelector<HTMLButtonElement>('nav button[aria-label="Preferences"]')!.click());
+  expect(current()).toEqual(['Preferences']);
+});
 async function connectPlayers(granted=true){
   const event={addListener:vi.fn(),removeListener:vi.fn()};
   const request=vi.fn(async()=>granted);
