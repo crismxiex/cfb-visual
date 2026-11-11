@@ -49,7 +49,7 @@ Severity weighs user impact, frequency, how central the workflow is, accessibili
 | The current page isn't announced in the sidebar (no `aria-current`). | Sidebar nav (observed) | Accessibility | **Low** | Screen-reader users don't hear which section is open. | Add `aria-current="page"`. |
 | The loading spinner ignores `prefers-reduced-motion`. | `.spin` keyframes (observed) | Accessibility | **Low** | People who turn off motion still get continuous rotation (WCAG 2.3.3, AAA but cheap). | Stop the animation when reduced motion is requested. |
 | The core view is below the fold. In the default window, Streaming Services, ticker, URL form and Player tools fill the first 730 px. The map starts at 909 px, Arrange at 1328 px and the lineup at 1413 px (viewport 860 px). | Workspace order in `main.tsx` (observed) | Architectural / IA | **High** | Every audio switch and layout change starts with a scroll. | **Proposal only** (restructures the main screen). Move map + lineup first. Fold Streaming Services and Player tools into a compact toolbar or collapsible section. |
-| Clicking lineup rows selects the game, but the rows can't be reached by keyboard. Selection is only possible from the tile. | `article.game-row` (observed) | Accessibility | **Medium** | Keyboard users have one route instead of two. Not blocking. | Proposal: add a "Listen" button to each row rather than a focusable row (avoids nested controls). |
+| Clicking a lineup row selects it as the game for keyboard shortcuts, but rows can't be reached by keyboard. Audio is fine: each row has a **Listen** button. | `article.game-row` (observed; corrected after rendering, since an earlier draft missed the Listen button) | Accessibility | **Low** | Keyboard users can't set the shortcut target from the lineup, only from the tile. | Proposal: a small "Select" action, or make Listen also set the selection. |
 | Tiles are `div role=button` containing real buttons (nested interactive controls). | Layout map (observed) | Accessibility / Architectural | **Medium** | Screen readers announce confusing structure. | Proposal: make the tile body a real `<button>` and keep the footer actions as siblings. |
 | Commands sent while another is running are silently ignored (`store.ts` drops them while busy). | `useDeck.send` (observed in code) | Interaction | **Medium** | A click during an arrange does nothing and gives no message. Most buttons are disabled while busy, which hides the problem. Keyboard shortcuts and a few buttons aren't disabled. | Proposal: queue or show a short "Busy — try again" status. Changes behavior, so not implemented. |
 | Errors appear at the top of the page even when the action happened further down. | `role=alert` banner in `main.tsx` (observed in code) | Interaction | **Medium** | When scrolled to the lineup, a failed action shows nothing visible. Screen readers still announce it. | Proposal: show the error next to the control that caused it, or as a fixed toast. |
@@ -78,7 +78,7 @@ Ranked by expected impact:
 1. Put the layout map and lineup first on Workspace, and collapse Streaming Services and Player tools.
 2. Show errors next to the action or as a fixed toast.
 3. Busy feedback instead of silently dropped commands.
-4. Make tiles real buttons, and add a Listen button to lineup rows.
+4. Make tiles real buttons, and let keyboard users set the shortcut target from the lineup.
 5. An undo toast for preset deletion.
 6. A "Layout options" disclosure under the layout picker.
 7. Gradually move styling to design tokens.
