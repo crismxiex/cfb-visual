@@ -75,7 +75,7 @@ One commit per fix, in order:
 
 Ranked by expected impact:
 
-1. Put the layout map and lineup first on Workspace, and collapse Streaming Services and Player tools.
+1. ~~Put the layout map and lineup first on Workspace.~~ **Done:** see the follow-up below. Collapsing Streaming Services and Player tools was not needed.
 2. Show errors next to the action or as a fixed toast.
 3. Busy feedback instead of silently dropped commands.
 4. Make tiles real buttons, and let keyboard users set the shortcut target from the lineup.
@@ -103,3 +103,21 @@ Ranked by expected impact:
 - **axe / Lighthouse / lint:** not installed in the project, so they weren't run. The contrast and target checks above are custom scripts, not a full axe audit.
 
 **Side effect:** the larger minimum text size moves the layout map from y = 909 to y = 927 in the default 1280×900 window (viewport 860). It was already below the fold, and this makes proposal 1 more pressing.
+
+## Follow-up: proposal 1 implemented
+
+Once the deck has at least one game, Workspace now shows the layout map, layout picker and lineup first. Streaming Services, the score ticker, the URL form and Player tools move into a labeled "Scores and setup" section below the lineup. An empty deck keeps the setup-first order, because that is what a new user needs.
+
+| Default 1280×900 window (viewport 860) | Before | After |
+|---|---|---|
+| Layout map | y = 927–1262 (off-screen) | y = 406–741 (fully visible) |
+| Arrange windows button | y = 1375 | y = 854 (at the fold) |
+| Lineup | y = 1460 | y = 940 |
+| Scroll needed to switch audio | Yes, every time | No |
+
+- **Measured with the mock:** 1264×860, 1440 and 768 px; no overflow.
+- **First game:** adding a game to an empty deck moves the map to the top, and focus returns to "Add existing tab" in the lineup heading.
+- **Footer labels:** a small follow-up keeps tile footer labels on one line. The larger text had made "Make main" wrap.
+- **Test:** a regression test pins both orders.
+- **Trade-off:** when the first game is added, the URL form the person just used moves below the lineup. That's a deliberate layout shift toward the next likely task (arrange or listen). It hasn't been tested with users.
+- **Not verified:** real Chrome.
