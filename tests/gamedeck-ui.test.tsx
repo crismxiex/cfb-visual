@@ -54,6 +54,23 @@ it('shows active audio separately from main position and marks other games muted
   expect(tile(1).querySelector('[aria-label="Tab audio enabled"]')).not.toBeNull();
   expect(tile(2).querySelector('[aria-label="Tab muted"]')).not.toBeNull();
 });
+it('Escape closes the tab picker and returns focus to the button that opened it',async()=>{
+  const opener=[...container.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('Add existing tab'))!;
+  opener.focus();
+  await act(async()=>opener.click());
+  expect(container.querySelector('[aria-label="Add existing Chrome tab"]')).not.toBeNull();
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Search open tabs');
+  await act(async()=>{document.activeElement!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));});
+  expect(container.querySelector('[aria-label="Add existing Chrome tab"]')).toBeNull();
+  expect(document.activeElement).toBe(opener);
+});
+it('Escape cancels swap mode without moving any game',async()=>{
+  await act(async()=>container.querySelector<HTMLButtonElement>('[title="Swap: choose another game on the layout map"]')!.click());
+  expect(container.textContent).toContain('Press Esc to cancel');
+  await act(async()=>{document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));});
+  expect(container.textContent).not.toContain('Press Esc to cancel');
+  expect(send).not.toHaveBeenCalled();
+});
 async function connectPlayers(granted=true){
   const event={addListener:vi.fn(),removeListener:vi.fn()};
   const request=vi.fn(async()=>granted);
