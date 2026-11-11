@@ -12,9 +12,11 @@ For YouTube TV, open a game at `tv.youtube.com` in your signed-in profile and ad
 
 Additional HTTPS service shortcuts can be saved in Preferences. Credentials in URLs are rejected and recognized token fields are removed before persistence. ESPN/ESPN+/WatchESPN shortcuts are rejected.
 
-Open **Sports Hub**, select **Enable scores**, and grant optional access to `site.api.espn.com`. Choose college football or NFL from the league menu. Both boards support team search, status and Favorites filters, Mexico City dates, game cards, and a compact ticker. The college football board also offers conference and ranked-game filters and an Oregon shortcut. Favorites and filters are saved locally.
+Open **Sports Hub**, select **Enable scores**, and grant optional access to `site.api.espn.com`. Choose college football, NFL, or college basketball from the league menu. Every board supports team search, status and Favorites filters, Mexico City dates, game cards, and a compact ticker. The college football and college basketball boards also offer conference and Top 25 filters; college football adds an Oregon shortcut. Favorites and filters are saved locally.
 
-Choose **NFL** from the league menu to see NFL matchups, kickoff times, live scores, and final results. Date, search, status, and Favorites filters work for both leagues. Each league keeps its own cache and saved favorites and ticker picks.
+Choose **NFL** from the league menu to see NFL matchups, kickoff times, live scores, and final results. Date, search, status, and Favorites filters work for every league. Each league keeps its own cache and saved favorites and ticker picks.
+
+Choose **College basketball** for NCAA Division I men’s games. The board loads the full D-I slate (up to 400 games a day), AP Top 25 ranks, and all 31 conferences, with Big Ten, SEC, Big 12, ACC, and Big East as quick filters. Live games show the half and clock (`1st half`, `2nd half`, `OT`). Alerts for favorite teams fire on score changes, the start of the second half, overtime, and finals. Basketball favorites are separate from football ones, even for schools that play both.
 
 ## ESPN endpoint research
 
@@ -43,7 +45,7 @@ npm run verify:scores -- 2026-11-07
 npm run verify:scores -- 2026-11-08 nfl
 ```
 
-The verification script calls ESPN's public feeds directly. [College football feed](https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=100&dates=20261107) · [NFL feed](https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=20261108)
+The verification script calls ESPN's public feeds directly. [College football feed](https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?groups=80&limit=100&dates=20261107) · [NFL feed](https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?limit=100&dates=20261108) · [College basketball feed](https://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard?groups=50&limit=400&dates=20261110)
 
 ### Schema and missing fields
 

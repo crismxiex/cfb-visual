@@ -1,11 +1,14 @@
 export const SCORE_LEAGUES={
-  cfb:{title:'CFB Live',label:'College Football · FBS',provider:'espn',path:'college-football'},
-  nfl:{title:'NFL Live',label:'National Football League',provider:'espn-nfl',path:'nfl'},
+  cfb:{title:'CFB Live',label:'College Football · FBS',provider:'espn',sport:'football',path:'college-football',college:true,scope:'All FBS'},
+  nfl:{title:'NFL Live',label:'National Football League',provider:'espn-nfl',sport:'football',path:'nfl',college:false,scope:'All NFL'},
+  cbb:{title:'CBB Live',label:'Men’s College Basketball · Division I',provider:'espn-cbb',sport:'basketball',path:'mens-college-basketball',college:true,scope:'All D-I'},
 } as const;
-export const SCORE_CACHE_KEYS={cfb:'gamedeckScores',nfl:'gamedeckNflScores'} as const;
+export const SCORE_CACHE_KEYS={cfb:'gamedeckScores',nfl:'gamedeckNflScores',cbb:'gamedeckCbbScores'} as const;
 export type ScoreLeague=keyof typeof SCORE_LEAGUES;
-export const leagueId=(league:ScoreLeague,id:string)=>league==='nfl'?`nfl:${id}`:id;
-export const isLeague=(value:unknown):value is ScoreLeague=>value==='cfb'||value==='nfl';
+// College football IDs predate multi-league support and stay unprefixed.
+export const leagueId=(league:ScoreLeague,id:string)=>league==='cfb'?id:`${league}:${id}`;
+export const inLeague=(league:ScoreLeague,id:string)=>league==='cfb'?!/^[a-z]+:/.test(id):id.startsWith(`${league}:`);
+export const isLeague=(value:unknown):value is ScoreLeague=>typeof value==='string'&&Object.hasOwn(SCORE_LEAGUES,value);
 export type ScoreStatus='scheduled'|'live'|'halftime'|'final'|'other';
 export type ScoreTeam={id:string;name:string;shortName:string;abbreviation:string;logo?:string;conferenceId?:string;rank?:number;rankPoll?:string;rankDate?:string;score:number|null;record?:string};
 export type ScoreEvent={id:string;provider:string;name:string;date:string;home:ScoreTeam;away:ScoreTeam;status:ScoreStatus;statusText:string;quarter?:number;clock?:string;possession?:string;networks:string[];venue?:string;detail?:string};
@@ -22,6 +25,13 @@ export type SportsView={settings:SportsSettings;cache:ScoreCache;access:boolean;
 export const defaults=():SportsSettings=>({enabled:false,league:'cfb',date:'',filter:'all',status:'all',query:'',mode:'expanded',favorites:[],links:{},alertsEnabled:true,mutedEvents:[],services:[],overlay:{enabled:false,position:'bottom',height:64,opacity:.94,clickThrough:false,reserve:false,eventIds:[]}});
 export const emptyCache=(league:ScoreLeague='cfb'):ScoreCache=>({events:[],date:'',updatedAt:0,attemptAt:0,nextPollAt:0,failures:0,error:'',coverageWarning:'',rankLabel:'',providerName:'ESPN · unofficial feed',attributionUrl:`https://www.espn.com/${SCORE_LEAGUES[league].path}/scoreboard`,alerts:[],overlayStatus:''});
 export const CONFERENCES:Record<string,string>={'1':'ACC','4':'Big 12','5':'Big Ten','8':'SEC','9':'Pac-12','12':'Conference USA','17':'Mountain West','18':'FBS Independents','37':'Sun Belt','151':'American'};
+// ESPN men's basketball conference IDs (verified against the D-I scoreboard, Nov 2026).
+export const CBB_CONFERENCES:Record<string,string>={'1':'America East','2':'ACC','3':'Atlantic 10','4':'Big East','5':'Big Sky','6':'Big South','7':'Big Ten','8':'Big 12','9':'Big West','10':'CAA','11':'Conference USA','12':'Ivy League','13':'MAAC','14':'MAC','16':'MEAC','18':'Missouri Valley','19':'NEC','20':'OVC','21':'Pac-12','22':'Patriot','23':'SEC','24':'SoCon','25':'Southland','26':'SWAC','27':'Sun Belt','29':'WCC','30':'UAC','44':'Mountain West','45':'Horizon','46':'ASUN','49':'Summit','62':'American'};
+export const conferences=(league:ScoreLeague):Record<string,string>=>league==='cfb'?CONFERENCES:league==='cbb'?CBB_CONFERENCES:{};
+export function periodLabel(league:ScoreLeague,period:number){
+  if(SCORE_LEAGUES[league].sport!=='basketball')return `Period ${period}`;
+  return period===1?'1st half':period===2?'2nd half':period===3?'OT':`${period-2}OT`;
+}
 export const MEXICO_TZ='America/Mexico_City';
 export const mexicoTime=(date:Date|number|string)=>new Intl.DateTimeFormat('en-US',{timeZone:MEXICO_TZ,hour:'numeric',minute:'2-digit'}).format(new Date(date));
 export const mexicoDate=(date:Date|number|string=Date.now())=>new Intl.DateTimeFormat('en-CA',{timeZone:MEXICO_TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(date));
@@ -31,9 +41,9 @@ export const live=(event:ScoreEvent)=>event.status==='live'||event.status==='hal
 export function selectEvents(events:ScoreEvent[],settings:SportsSettings){return events.filter(e=>{
   const teams=[e.home,e.away];
   if(settings.filter==='live'&&!live(e))return false;
-  if(settings.league==='cfb'){
+  if(SCORE_LEAGUES[settings.league].college){
     if((settings.filter==='ranked'||settings.rankedOnly)&&!teams.some(t=>t.rank!==undefined&&t.rank<=25))return false;
-    if(CONFERENCES[settings.filter]&&!teams.some(t=>t.conferenceId===settings.filter))return false;
+    if(conferences(settings.league)[settings.filter]&&!teams.some(t=>t.conferenceId===settings.filter))return false;
   }
   if(settings.filter==='favorites'&&!teams.some(t=>settings.favorites.includes(leagueId(settings.league,t.id))))return false;
   if(settings.status!=='all'&&!(settings.status==='live'?live(e):e.status===settings.status))return false;
