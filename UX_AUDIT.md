@@ -82,3 +82,24 @@ Ranked by expected impact:
 5. An undo toast for preset deletion.
 6. A "Layout options" disclosure under the layout picker.
 7. Gradually move styling to design tokens.
+
+## Verification (2026-11-10)
+
+**Passed**
+- **Typecheck:** `tsc --noEmit`.
+- **Tests:** `npm test` — 35 legacy tests plus 190 Vitest tests, including new tests for Esc closing dialogs, focus returning to the opener, Esc cancelling swap mode, and `aria-current`.
+- **Build:** `npm run build`.
+
+**Measured in the browser (mocked extension APIs)**
+- **Contrast:** 0 AA failures across all five sections at 1440 px, and in the warning, offline-game, empty-deck and error states. Before: 46 failures on Workspace alone.
+- **Text size:** no visible text below 10 px. Before: as small as 5 px.
+- **Overflow:** none at 1440, 1264, 768, 520 and 375 px. Before: 547 px of content at 520 px.
+- **Keyboard:** checked with real key presses. Tab and Shift+Tab stay inside the tab picker, Esc closes it, and focus returns to "Add existing tab". Text fields and dropdowns show a 2 px focus outline.
+- **Workflows:** ran end to end against the mock — add tab, listen via tile, Make main, change layout, edit-details dialog with Esc, URL error alert, and the score-link dialog with Esc.
+
+**Not verified**
+- **Real Chrome:** the dashboard wasn't loaded as an extension with real tabs and windows. All browser checks used mocked `chrome.*` APIs.
+- **Reduced motion:** the rule is confirmed loaded, but the browser tool can't turn the OS setting on, so the effect wasn't observed.
+- **axe / Lighthouse / lint:** not installed in the project, so they weren't run. The contrast and target checks above are custom scripts, not a full axe audit.
+
+**Side effect:** the larger minimum text size moves the layout map from y = 909 to y = 927 in the default 1280×900 window (viewport 860). It was already below the fold, and this makes proposal 1 more pressing.
