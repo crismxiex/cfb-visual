@@ -77,6 +77,16 @@ it('marks only the open sidebar section as the current page',async()=>{
   await act(async()=>container.querySelector<HTMLButtonElement>('nav button[aria-label="Preferences"]')!.click());
   expect(current()).toEqual(['Preferences']);
 });
+it('leads with the layout map once games exist and with setup on an empty deck',async()=>{
+  const before=(a:string,b:string)=>!!(container.querySelector(a)!.compareDocumentPosition(container.querySelector(b)!)&Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(before('.arrangement','.url-form')).toBe(true);
+  expect(before('.lineup','.url-form')).toBe(true);
+  expect(container.querySelector('[aria-label="Scores and setup"] .url-form')).not.toBeNull();
+  const view=structuredClone(useDeck.getState().view!);view.deck.games=[];view.runtime.bindings={};
+  await act(async()=>useDeck.setState({view}));
+  expect(before('.url-form','.arrangement')).toBe(true);
+  expect(container.querySelector('[aria-label="Scores and setup"]')).toBeNull();
+});
 async function connectPlayers(granted=true){
   const event={addListener:vi.fn(),removeListener:vi.fn()};
   const request=vi.fn(async()=>granted);
