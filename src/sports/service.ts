@@ -17,7 +17,11 @@ export function createScoreboardService(api:typeof chrome,windows:WindowControll
       write:async value=>{await api.storage.local.set({gamedeckScoreRanks:value});},
     }),
     nfl:new EspnScoreProvider(fetch,now,undefined,'nfl'),
-  };
+    cbb:new EspnScoreProvider(fetch,now,{
+      read:async()=>(await api.storage.local.get('gamedeckCbbScoreRanks')).gamedeckCbbScoreRanks as {at:number;raw:unknown}|undefined,
+      write:async value=>{await api.storage.local.set({gamedeckCbbScoreRanks:value});},
+    },'cbb'),
+  } satisfies Record<ScoreLeague,ScoreProvider>;
   let notify:((view:SportsView)=>Promise<string|void>)|undefined;
   let tail=Promise.resolve<unknown>(undefined);
   let publications=Promise.resolve<unknown>(undefined);
@@ -36,6 +40,7 @@ export function createScoreboardService(api:typeof chrome,windows:WindowControll
     caches={
       cfb:{...emptyCache('cfb'),...data[SCORE_CACHE_KEYS.cfb] as Partial<ScoreCache>},
       nfl:{...emptyCache('nfl'),...data[SCORE_CACHE_KEYS.nfl] as Partial<ScoreCache>},
+      cbb:{...emptyCache('cbb'),...data[SCORE_CACHE_KEYS.cbb] as Partial<ScoreCache>},
     };
     await schedule();
   })();return loading;}
@@ -96,6 +101,8 @@ export function createScoreboardService(api:typeof chrome,windows:WindowControll
       const oldDate=selectedDate();
       const oldLeague=settings.league;
       if(p.league!==undefined)settings.league=p.league;
+      // Conference IDs are per-sport (5 is Big Ten in football, Big Sky in basketball).
+      if(settings.league!==oldLeague&&p.filter===undefined&&/^\d+$/.test(settings.filter))settings.filter='all';
       for(const key of ['enabled','alertsEnabled','rankedOnly'] as const)if(typeof p[key]==='boolean')settings[key]=p[key]!;
       for(const key of ['date','filter','status','query'] as const)if(typeof p[key]==='string')settings[key]=p[key]!.slice(0,100);
       if(p.mode==='compact'||p.mode==='expanded')settings.mode=p.mode;
