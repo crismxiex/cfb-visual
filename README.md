@@ -2,7 +2,7 @@
 
 GameDeck is a sports window manager for Chrome on Windows. Arrange streams from your signed-in Chrome profile, save layouts, and switch game audio from one dashboard. Streams play in their original browser tabs.
 
-GameDeck started with college football (CFB) and the NFL. Sports Hub provides schedules, live scores, and tickers for both. **NBA, MLB, and March Madness** score coverage is planned.
+GameDeck covers college football (CFB), the NFL, and NCAA men’s college basketball (all of Division I). Sports Hub provides schedules, live scores, and tickers for each. **NBA and MLB** score coverage is planned.
 
 Open **Sports Hub → Enable scores** to choose a league, favorite teams, and link scores to your streams. Use **Open browser ticker** for a separate Chrome score window or install the Windows helper for the native desktop ticker. Chrome 120 or later is required. [Sports Hub guide](docs/SPORTS-HUB.md)
 

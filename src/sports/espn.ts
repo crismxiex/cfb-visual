@@ -24,7 +24,7 @@ export function normalizeScoreboard(raw:unknown,ranks:PollRanks={},league:ScoreL
     const make=(side:string):ScoreTeam|undefined=>{
       const competitor=competitors.find(t=>t.homeAway===side);if(!competitor)return;
       const team=obj(competitor.team),teamId=id(team.id||competitor.id),name=str(team.displayName)||str(team.location);if(!teamId||!name)return;
-      const rank=ranks[teamId],curated=league==='cfb'?num(obj(competitor.curatedRank).current):undefined,s=num(competitor.score);
+      const rank=ranks[teamId],curated=SCORE_LEAGUES[league].college?num(obj(competitor.curatedRank).current):undefined,s=num(competitor.score);
       return {id:teamId,name,shortName:str(team.shortDisplayName)||str(team.location)||name,abbreviation:str(team.abbreviation)||name,logo:https(team.logo)||https(obj(arr(team.logos)[0]).href),conferenceId:id(team.conferenceId)||undefined,score:s!==undefined&&Number.isInteger(s)&&s>=0?s:null,
         rank:rank?.rank||(curated&&curated<=25?curated:undefined),rankPoll:rank?.poll||(curated&&curated<=25?'ESPN curated · poll not supplied':undefined),rankDate:rank?.date,record:str(obj(arr(competitor.records).find(v=>obj(v).type==='total')).summary)||undefined};
     };
@@ -49,9 +49,9 @@ export class EspnScoreProvider implements ScoreProvider{
   private rankCache:{at:number;raw:unknown}|undefined;
   private rankLoaded=false;
   constructor(private fetcher:typeof fetch=fetch,private now=()=>Date.now(),private rankStore?:RankCacheStore,private league:ScoreLeague='cfb'){
-    const {path,provider}=SCORE_LEAGUES[league];
+    const {path,provider,sport}=SCORE_LEAGUES[league];
     this.id=provider;
-    this.baseUrl=`https://site.api.espn.com/apis/site/v2/sports/football/${path}/`;
+    this.baseUrl=`https://site.api.espn.com/apis/site/v2/sports/${sport}/${path}/`;
     this.attributionUrl=`https://www.espn.com/${path}/scoreboard`;
   }
   private async json(url:string){
@@ -63,15 +63,18 @@ export class EspnScoreProvider implements ScoreProvider{
   async fetchScores(date:string):Promise<ScoreBatch>{
     if(!validDate(date))throw new Error('Choose a valid scoreboard date.');
     const next=new Date(Date.parse(date+'T12:00:00Z')+86400000).toISOString().slice(0,10);
-    // The verified limit is 100. Values such as 1000 fell back to a 25-game subset.
-    const college=this.league==='cfb';
-    const group=college?'groups=80&':'';
-    const urls=[date,next].map(d=>`${this.baseUrl}scoreboard?${group}limit=100&dates=${d.replaceAll('-','')}`);
+    // Football's verified limit is 100; values such as 1000 fell back to a 25-game subset.
+    // Basketball's D-I group (50) honors 400, which covers the busiest opening-day slates (~180 games).
+    const cfb=this.league==='cfb',college=SCORE_LEAGUES[this.league].college;
+    const group=this.league==='cfb'?'groups=80&':this.league==='cbb'?'groups=50&':'';
+    const limit=this.league==='cbb'?400:100;
+    const urls=[date,next].map(d=>`${this.baseUrl}scoreboard?${group}limit=${limit}&dates=${d.replaceAll('-','')}`);
     const [first,second]=await Promise.all(urls.map(u=>this.json(u)));
     const supplemental:unknown[]=[];let coverageIssue=false;
     // Only expand to conference queries if the verified daily limit is reached.
     // Normal polling remains two scoreboard calls, plus a six-hour ranking cache.
-    if(college)for(const [index,raw]of [first,second].entries())if(arr(obj(raw).events).length>=100){
+    if(!cfb&&[first,second].some(raw=>arr(obj(raw).events).length>=limit))coverageIssue=true;
+    if(cfb)for(const [index,raw]of [first,second].entries())if(arr(obj(raw).events).length>=100){
       for(const group of Object.keys(CONFERENCES)){
         try{const value=await this.json(`${this.baseUrl}scoreboard?groups=${group}&limit=100&dates=${[date,next][index].replaceAll('-','')}`);supplemental.push(value);if(arr(obj(value).events).length>=100)coverageIssue=true;}catch{coverageIssue=true;}
       }
@@ -89,6 +92,7 @@ export class EspnScoreProvider implements ScoreProvider{
     const all=[first,second,...supplemental].flatMap(raw=>normalizeScoreboard(raw,ranks,this.league));
     const events=[...new Map(all.filter(e=>mexicoDate(e.date)===date).map(e=>[e.id,e])).values()].sort((a,b)=>a.date.localeCompare(b.date));
     const rankLabel=college?(Object.keys(ranks).length?'AP Top 25 (dated poll); unspecified curated ranks labeled separately':'ESPN curated ranks · poll not supplied'):'';
-    return {events,date,coverageWarning:[coverageIssue?'Some conference fallback data was unavailable or capped; the slate may be incomplete.':'',rankingWarning].filter(Boolean).join(' '),rankLabel};
+    const coverage=!coverageIssue?'':cfb?'Some conference fallback data was unavailable or capped; the slate may be incomplete.':'ESPN capped this slate; some games may be missing.';
+    return {events,date,coverageWarning:[coverage,rankingWarning].filter(Boolean).join(' '),rankLabel};
   }
 }

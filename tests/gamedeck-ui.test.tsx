@@ -54,6 +54,39 @@ it('shows active audio separately from main position and marks other games muted
   expect(tile(1).querySelector('[aria-label="Tab audio enabled"]')).not.toBeNull();
   expect(tile(2).querySelector('[aria-label="Tab muted"]')).not.toBeNull();
 });
+it('Escape closes the tab picker and returns focus to the button that opened it',async()=>{
+  const opener=[...container.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('Add existing tab'))!;
+  opener.focus();
+  await act(async()=>opener.click());
+  expect(container.querySelector('[aria-label="Add existing Chrome tab"]')).not.toBeNull();
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Search open tabs');
+  await act(async()=>{document.activeElement!.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));});
+  expect(container.querySelector('[aria-label="Add existing Chrome tab"]')).toBeNull();
+  expect(document.activeElement).toBe(opener);
+});
+it('Escape cancels swap mode without moving any game',async()=>{
+  await act(async()=>container.querySelector<HTMLButtonElement>('[title="Swap: choose another game on the layout map"]')!.click());
+  expect(container.textContent).toContain('Press Esc to cancel');
+  await act(async()=>{document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));});
+  expect(container.textContent).not.toContain('Press Esc to cancel');
+  expect(send).not.toHaveBeenCalled();
+});
+it('marks only the open sidebar section as the current page',async()=>{
+  const current=()=>[...container.querySelectorAll('nav button[aria-current="page"]')].map(b=>b.getAttribute('aria-label'));
+  expect(current()).toEqual(['Workspace']);
+  await act(async()=>container.querySelector<HTMLButtonElement>('nav button[aria-label="Preferences"]')!.click());
+  expect(current()).toEqual(['Preferences']);
+});
+it('leads with the layout map once games exist and with setup on an empty deck',async()=>{
+  const before=(a:string,b:string)=>!!(container.querySelector(a)!.compareDocumentPosition(container.querySelector(b)!)&Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(before('.arrangement','.url-form')).toBe(true);
+  expect(before('.lineup','.url-form')).toBe(true);
+  expect(container.querySelector('[aria-label="Scores and setup"] .url-form')).not.toBeNull();
+  const view=structuredClone(useDeck.getState().view!);view.deck.games=[];view.runtime.bindings={};
+  await act(async()=>useDeck.setState({view}));
+  expect(before('.url-form','.arrangement')).toBe(true);
+  expect(container.querySelector('[aria-label="Scores and setup"]')).toBeNull();
+});
 async function connectPlayers(granted=true){
   const event={addListener:vi.fn(),removeListener:vi.fn()};
   const request=vi.fn(async()=>granted);
@@ -130,6 +163,30 @@ it('selects NFL from the Sports Hub and shows its scores without college filters
   expect(container.querySelector('.score-card')?.textContent).toContain('Bills');
   expect(container.querySelector('[aria-label="Conference filter"]')).toBeNull();
   expect(container.textContent).not.toContain('Top 25');
+});
+it('selects college basketball with Division I conferences, Top 25 and halves',async()=>{
+  await connectPlayers();
+  const command=await scores(false);
+  const selector=container.querySelector<HTMLSelectElement>('[aria-label="Score league"]')!;
+  await act(async()=>{selector.value='cbb';selector.dispatchEvent(new Event('change',{bubbles:true}));});
+  expect(command).toHaveBeenCalledWith({type:'SPORTS_SETTINGS',patch:{league:'cbb'}});
+  const current=useSports.getState().view!;
+  const game=current.cache.events[0];
+  const hoops={...game,provider:'espn-cbb',name:'Duke Blue Devils at North Carolina Tar Heels',status:'live' as const,quarter:2,clock:'4:12',
+    away:{...game.away,id:'150',name:'Duke Blue Devils',shortName:'Duke',abbreviation:'DUKE',conferenceId:'2'},
+    home:{...game.home,id:'153',name:'North Carolina Tar Heels',shortName:'North Carolina',abbreviation:'UNC',conferenceId:'2'},
+  };
+  await act(async()=>useSports.setState({view:{...current,settings:{...current.settings,league:'cbb',filter:'all'},cache:{...current.cache,events:[hoops]}}}));
+  expect(container.querySelector('[aria-label="CBB Live"]')).not.toBeNull();
+  const chips=[...container.querySelectorAll('.filter-chip')].map(b=>b.textContent);
+  expect(chips).toEqual(['All D-I','Live','Top 25','Big Ten','SEC','Big 12','ACC','Big East','Favorites']);
+  const conferences=[...container.querySelectorAll<HTMLOptionElement>('[aria-label="Conference filter"] option')].map(o=>o.textContent);
+  expect(conferences).toContain('Missouri Valley');
+  expect(container.querySelector('.score-card')?.textContent).toContain('ACC');
+  expect(container.textContent).not.toContain('Oregon');
+  await act(async()=>container.querySelector<HTMLElement>('[aria-label="Details for Duke Blue Devils at North Carolina Tar Heels"]')!.click());
+  expect(container.querySelector('.score-details')?.textContent).toContain('Tip-off');
+  expect(container.querySelector('.score-details')?.textContent).toContain('2nd half · 4:12');
 });
 it('shows YouTube TV alongside the Mexico streaming shortcuts',()=>{
   const services=container.querySelector('[aria-label="Streaming Services"]')!;expect(services.textContent).toContain('Disney+ Mexico');expect(services.textContent).toContain('DAZN Mexico');expect(services.textContent).toContain('YouTube TV');expect(services.textContent).not.toContain('ESPN');

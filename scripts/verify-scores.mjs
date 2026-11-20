@@ -5,7 +5,7 @@ await build({configFile:false,logLevel:'error',build:{ssr:'src/sports/espn.ts',o
 const {EspnScoreProvider}=await import(pathToFileURL(path.resolve('artifacts/provider-verify/provider.mjs')).href);
 const date=process.argv[2]||new Intl.DateTimeFormat('en-CA',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const league=process.argv[3]||'cfb';
-if(league!=='cfb'&&league!=='nfl')throw new Error('Choose cfb or nfl.');
+if(!['cfb','nfl','cbb'].includes(league))throw new Error('Choose cfb, nfl, or cbb.');
 const result=await new EspnScoreProvider(undefined,undefined,undefined,league).fetchScores(date);
 console.log(JSON.stringify({league,date:result.date,events:result.events.length,live:result.events.filter(e=>e.status==='live'||e.status==='halftime').length,rankLabel:result.rankLabel,coverageWarning:result.coverageWarning||null,oregon:league==='cfb'?result.events.find(e=>[e.home.id,e.away.id].includes('2483'))?.name||null:undefined},null,2));
 if(!Array.isArray(result.events))process.exitCode=1;
